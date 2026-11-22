@@ -343,11 +343,22 @@ $("line").addEventListener("click",function(e){
 $("re").addEventListener("click",load);
 $("more").addEventListener("click",function(){showAll=!showAll;render()});
 fetch("/route.json").then(function(r){return r.text()}).then(function(t){return JSON.parse(t.replace(/[\r\n]/g,""))}).then(function(data){
-
+  return fetch("/medivada.json").then(function(r){return r.json()}).then(function(m){
+    var a = data.stopAt ? data.stopAt[m.stopFrom] : m.fromIndex
+    var b = (data.stopAt ? data.stopAt[m.stopTo] : m.toIndex) + 1
+    var delta = m.shape.length - (b - a)
+    data.shape = data.shape.slice(0, a).concat(m.shape, data.shape.slice(b))
+    if (data.stopAt) data.stopAt = data.stopAt.map(function (x) {
+      if (x <= a) return x
+      if (x < b) return a + Math.round((x - a) / (b - a - 1) * (m.shape.length - 1))
+      return x + delta
+    })
+    return data
+  })
+}).then(function(data){
   R=data;R.trips.forEach(function(t){tripById[t.id]=t});
   buildGeo();renderStopSelect();initMap();render();load();schedule();
 }).catch(function(){status(false,"Could not load route data. Please reload.")});
-})();
 </script>
 <link rel="stylesheet" href="theme.css">
 <script src="extras.js"></script>
