@@ -1,0 +1,12 @@
+/* Blue theme + byline. Loaded after the page's own styles, so these values win. */
+:root{--bg:#eef1fa;--ink:#141a33;--muted:#5f6683;--line:#cdd2e6;--soft:#f4f6fc;--bus:#2f46c9}
+header{background:#2f46c9}
+.dirs button[aria-pressed=true]{color:#1f2f8f}
+@media (prefers-color-scheme:dark){
+:root{--bg:#0d1226;--ink:#e8ebf8;--muted:#9aa3c7;--line:#2b3358;--card:#161d3a;--soft:#1b2345;--bus:#6a7ff2}
+header{background:#1f2f8f}
+}
+.by{display:flex;align-items:center;gap:12px;margin-top:28px;padding:14px 16px;background:var(--card);border-radius:16px}
+.by img{width:56px;height:56px;border-radius:50%;object-fit:cover;flex:none;background:var(--soft)}
+.by b{display:block}
+.by span{font-size:14px;color:var(--muted)}

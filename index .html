@@ -1,0 +1,355 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Narsipatnam ⇄ Chodavaram · Live APSRTC buses</title>
+<meta name="description" content="Live APSRTC bus tracking between Narsipatnam and Chodavaram: where each bus is now, when it reaches your stop, and the full day's timetable.">
+<meta name="theme-color" content="#0f5c40">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css" crossorigin="anonymous">
+<style>
+:root{--bg:#eef2ee;--ink:#11241c;--muted:#5d6e66;--line:#c9d4cd;--card:#fff;--soft:#f5f8f6;--accent:#f2a900;--bus:#0f7a52;--late:#b4480c;--bad:#c62828;color-scheme:light}
+@media (prefers-color-scheme:dark){:root{--bg:#0b1612;--ink:#e6efea;--muted:#93a59c;--line:#2c3d35;--card:#13221c;--soft:#182a22;--accent:#f5b82e;--bus:#2fc48a;--late:#ff9a5c;--bad:#ff6b6b;color-scheme:dark}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.45 system-ui,-apple-system,"Segoe UI","Noto Sans Telugu",sans-serif;padding:env(safe-area-inset-top,0) 0 env(safe-area-inset-bottom,0)}
+.wrap{max-width:560px;margin:0 auto;padding:18px 14px 40px}
+header{background:var(--bus);color:#fff;border-radius:20px;padding:18px 18px 16px;position:relative;overflow:hidden}
+@media (prefers-color-scheme:dark){header{background:#0f5c40}}
+header:after{content:"";position:absolute;right:-30px;top:-30px;width:140px;height:140px;border-radius:50%;border:18px solid rgba(255,255,255,.08)}
+h1{font-size:24px;line-height:1.15;margin:0}
+h1 small{display:block;font-size:14px;font-weight:500;opacity:.85;margin-top:4px}
+.dirs{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:14px}
+.dirs button{all:unset;cursor:pointer;text-align:center;padding:10px 8px;border-radius:12px;background:rgba(255,255,255,.14);font-weight:600;font-size:15px}
+.dirs button[aria-pressed=true]{background:#fff;color:#0f5c40}
+.dirs b{display:block;font-size:12px;font-weight:600;opacity:.8}
+.row{display:flex;align-items:center;gap:10px;margin:14px 2px}
+label.stop{display:flex;flex-direction:column;flex:1;font-size:13px;color:var(--muted);font-weight:600}
+select{font:600 16px system-ui;color:var(--ink);background:var(--card);border:2px solid var(--line);border-radius:12px;padding:9px 10px;margin-top:4px;width:100%}
+.stat{display:flex;align-items:center;gap:8px;font-size:14px;color:var(--muted);margin:4px 2px 10px}
+.dot{width:10px;height:10px;border-radius:50%;background:var(--line);flex:none}
+.ok .dot{background:var(--bus);box-shadow:0 0 0 0 var(--bus);animation:pulse 2s infinite}.bad .dot{background:var(--bad)}
+@keyframes pulse{0%{box-shadow:0 0 0 0 color-mix(in srgb,var(--bus) 60%,transparent)}70%{box-shadow:0 0 0 8px transparent}100%{box-shadow:0 0 0 0 transparent}}
+@media (prefers-reduced-motion:reduce){.ok .dot{animation:none}}
+.refresh{margin-left:auto;border:0;background:none;color:var(--bus);font:600 14px system-ui;cursor:pointer;padding:6px}
+h2{font-size:17px;margin:26px 2px 10px;display:flex;align-items:baseline;gap:8px}
+h2 span{font-size:13px;color:var(--muted);font-weight:500}
+.card{background:var(--card);border-radius:16px;padding:14px 16px;margin-bottom:10px}
+.bus{display:grid;grid-template-columns:1fr auto;gap:2px 12px}
+.bus .eta{grid-row:span 3;text-align:right;align-self:center}
+.eta b{display:block;font-size:26px;line-height:1;color:var(--bus)}
+.eta span{font-size:12px;color:var(--muted)}
+.bus .t{font-weight:700}
+.bus .t small{font-weight:500;color:var(--muted);margin-left:6px}
+.bus .w,.bus .m{font-size:14px;color:var(--muted)}
+.bus .w strong{color:var(--ink);font-weight:600}
+.late{color:var(--late);font-weight:600}.ontime{color:var(--bus);font-weight:600}
+.dim{opacity:.55}
+.empty{color:var(--muted);font-size:15px}
+.line{position:relative;padding:4px 0 4px 0}
+.st{position:relative;display:flex;align-items:center;min-height:44px;padding-left:44px;cursor:pointer}
+.st:before{content:"";position:absolute;left:19px;top:0;bottom:0;width:4px;background:var(--line)}
+.st:first-child:before{top:50%}.st:last-child:before{bottom:50%}
+.st i{position:absolute;left:13px;width:16px;height:16px;border-radius:50%;background:var(--card);border:4px solid var(--muted)}
+.st.me i{border-color:var(--accent);background:var(--accent)}
+.st.me .n{font-weight:700}
+.st .n{flex:1}
+.st .tm{font-size:13px;color:var(--muted);text-align:right}
+.gap{position:relative;padding-left:44px;min-height:0}
+.gap:before{content:"";position:absolute;left:19px;top:0;bottom:0;width:4px;background:var(--line)}
+.chip{display:inline-flex;align-items:center;gap:6px;background:var(--bus);color:#fff;font-size:13px;font-weight:600;border-radius:999px;padding:3px 10px 3px 4px;margin:3px 0}
+.chip:before{content:"🚌";background:#fff;border-radius:50%;width:22px;height:22px;display:grid;place-items:center;font-size:12px}
+.chip.old{background:var(--muted)}
+.gap .chip{position:relative;left:-34px}
+#map{height:320px;border-radius:16px;overflow:hidden;background:var(--soft)}
+.bm{background:var(--bus);color:#fff;font:700 11px system-ui;border:2px solid #fff;border-radius:10px;padding:2px 6px;white-space:nowrap;box-shadow:0 1px 4px rgba(0,0,0,.35);transform:translate(-50%,-50%);display:inline-block}
+.bm.old{background:#6b7a73}
+table{width:100%;border-collapse:collapse;font-size:15px}
+td{padding:10px 4px;border-bottom:1px solid var(--line);vertical-align:top}
+tr:last-child td{border:0}
+td.tt{font-weight:700;font-variant-numeric:tabular-nums;width:64px}
+td.s{color:var(--muted);font-size:13px;text-align:right}
+.tag{display:inline-block;font-size:11px;font-weight:700;border-radius:6px;padding:1px 6px;background:var(--bus);color:#fff;margin-left:6px;vertical-align:1px}
+.tag.u{background:var(--soft);color:var(--muted)}
+.more{display:block;width:100%;border:2px solid var(--line);background:none;color:var(--ink);font:600 15px system-ui;border-radius:12px;padding:10px;margin-top:8px;cursor:pointer}
+details{margin-top:8px}summary{cursor:pointer;color:var(--muted);font-size:14px}
+footer{margin-top:28px;font-size:13px;color:var(--muted)}
+footer a{color:inherit}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header>
+  <h1>Narsipatnam ⇄ Chodavaram<small>నర్సీపట్నం ⇄ చోడవరం · Live APSRTC Palle Velugu buses</small></h1>
+  <div class="dirs" role="group" aria-label="Direction">
+    <button type="button" data-dir="0" aria-pressed="true"><b>Towards</b>Chodavaram<span class="cnt"></span></button>
+    <button type="button" data-dir="1" aria-pressed="false"><b>Towards</b>Narsipatnam<span class="cnt"></span></button>
+  </div>
+</header>
+
+<div class="row">
+  <label class="stop">I'm boarding at<select id="stop"></select></label>
+</div>
+<div class="stat" id="stat"><span class="dot"></span><span id="msg">Connecting to live feed…</span><button class="refresh" id="re" type="button">Refresh</button></div>
+
+<h2>Live buses <span id="livehint"></span></h2>
+<div id="live"></div>
+
+<h2>Route <span>tap a stop to choose it</span></h2>
+<div class="card line" id="line"></div>
+
+<h2>Map</h2>
+<div id="map" role="region" aria-label="Map of live bus positions"></div>
+
+<h2>Timetable <span id="tthint"></span></h2>
+<div class="card"><table id="tt"></table><button class="more" id="more" type="button">Show full day</button></div>
+
+<footer>
+  <p>Only buses with working GPS appear live. A bus missing here may still be running; check the timetable. Arrival times are estimates from the bus's live position and the APSRTC schedule.</p>
+  <p>Live data: APSRTC via <a href="https://maps.reclaim.city/apsrtc/" rel="noopener">reclaim.city</a> (GTFS-Realtime). Map © <a href="https://www.openstreetmap.org/copyright" rel="noopener">OpenStreetMap</a> contributors.</p>
+</footer>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js" crossorigin="anonymous"></script>
+<script>
+(function(){
+"use strict";
+var POLL_MS=15000, STALE_S=15*60, DROP_S=60*60, IST=330;
+var R=null, cum=[], stopKm=[], total=0, live=[], feedTime=null, lastOk=0, showAll=false;
+var state={dir:+(localStorage.getItem("nc.dir")||0), my:localStorage.getItem("nc.my")||null};
+function $(i){return document.getElementById(i)}
+function esc(s){return String(s==null?"":s).replace(/[&<>"]/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]})}
+function title(s){return s.toLowerCase().replace(/(^|[\s-])\w/g,function(m){return m.toUpperCase()}).replace(/^T /,"T. ")}
+function now(){return Date.now()/1000}
+
+/* ---------- geometry ---------- */
+var K=Math.cos(17.75*Math.PI/180);
+function xy(p){return [p[1]*111.32*K,p[0]*110.57]}
+function buildGeo(){
+  cum=[0];
+  for(var i=1;i<R.shape.length;i++){var a=xy(R.shape[i-1]),b=xy(R.shape[i]);cum.push(cum[i-1]+Math.hypot(b[0]-a[0],b[1]-a[1]))}
+  total=cum[cum.length-1];
+  stopKm=R.stopAt.map(function(i){return cum[i]});
+}
+function project(lat,lon){
+  var q=xy([lat,lon]),best={d:1e9,km:0};
+  for(var i=1;i<R.shape.length;i++){
+    var a=xy(R.shape[i-1]),b=xy(R.shape[i]),dx=b[0]-a[0],dy=b[1]-a[1],L=dx*dx+dy*dy;
+    var t=L?Math.max(0,Math.min(1,((q[0]-a[0])*dx+(q[1]-a[1])*dy)/L)):0;
+    var px=a[0]+t*dx,py=a[1]+t*dy,d=Math.hypot(q[0]-px,q[1]-py);
+    if(d<best.d)best={d:d,km:cum[i-1]+t*(cum[i]-cum[i-1])};
+  }
+  return best;
+}
+
+/* ---------- time (all schedule times are IST) ---------- */
+function hm(s){var p=s.split(":");return +p[0]*60+ +p[1]}
+function istMin(){return ((Date.now()/60000+IST)%1440+1440)%1440}
+function clock(sec){var m=Math.round(((sec/60+IST)%1440+1440)%1440);var h=Math.floor(m/60)%24,mm=m%60;return (h%12||12)+":"+(mm<10?"0":"")+mm+(h<12?" am":" pm")}
+function clockM(m){return clock((m-IST)*60)}
+function dur(min){min=Math.round(min);if(min<1)return "now";if(min<60)return min+" min";return Math.floor(min/60)+" h "+(min%60?min%60+" min":"")}
+function ago(s){s=Math.max(0,s);return s<90?Math.round(s)+" s ago":Math.round(s/60)+" min ago"}
+// absolute epoch seconds for each stop of a trip, in travel order
+function tripTimes(trip,startDate){
+  var base;
+  if(startDate&&/^\d{8}$/.test(startDate)){base=Date.UTC(+startDate.slice(0,4),+startDate.slice(4,6)-1,+startDate.slice(6,8))/1000-IST*60}
+  else{var d=Math.floor((Date.now()/1000+IST*60)/86400)*86400-IST*60;base=d;if(base+hm(trip.t[0])*60>now()+6*3600)base-=86400}
+  var out=[],prev=-1,add=0;
+  trip.t.forEach(function(s){var m=hm(s);if(m<prev)add+=1440;prev=m;out.push(base+(m+add)*60)});
+  return out;
+}
+function travelStops(dir){var a=R.stops.map(function(s,i){return i});return dir?a.reverse():a}
+function travelKm(dir){return travelStops(dir).map(function(i){return dir?total-stopKm[i]:stopKm[i]})}
+
+/* ---------- live bus model ---------- */
+var tripById={};
+function model(b){
+  var trip=tripById[b.trip];if(!trip)return null;
+  var dir=trip.dir,tk=travelKm(dir),ts=travelStops(dir),pr=project(b.lat,b.lon);
+  var p=dir?total-pr.km:pr.km,times=tripTimes(trip,b.date),n=ts.length,t=now();
+  var age=b.ts?t-b.ts:0; if(age>DROP_S)return null;
+  // scheduled time at the bus's current position
+  var k=0;while(k<n-2&&tk[k+1]<p)k++;
+  var f=tk[k+1]>tk[k]?Math.max(0,Math.min(1,(p-tk[k])/(tk[k+1]-tk[k]))):0;
+  var schedHere=times[k]+f*(times[k+1]-times[k]);
+  var arrived=p>tk[n-1]-0.4;
+  var waiting=p<0.4&&!arrived; // still at the starting bus stand
+  // seconds behind schedule; a bus still at the stand is only late once its departure time has passed
+  var shift=waiting?Math.max(t,times[0])-times[0]:(t-schedHere);
+  var etas=times.map(function(x,i){return !waiting&&tk[i]<=p+0.15?null:Math.max(t,x+shift)});
+  var next=-1;for(var i=0;i<n;i++)if(etas[i]!=null){next=i;break}
+  var near=-1;for(i=0;i<n;i++)if(Math.abs(tk[i]-p)<0.35){near=i;break}
+  return {b:b,trip:trip,dir:dir,p:p,km:pr.km,off:pr.d,age:age,old:age>STALE_S,times:times,etas:etas,delay:shift/60,
+    next:next,near:near,ts:ts,waiting:waiting,arrived:arrived||next<0};
+}
+
+/* ---------- rendering ---------- */
+function stopName(i){return title(R.stops[i].n)}
+function myIdx(){var i=R.stops.findIndex(function(s){return s.id===state.my});return i<0?(state.dir?R.stops.length-1:0):i}
+function lateTxt(min){
+  if(min==null)return "";
+  if(min>=3)return '<span class="late">'+dur(min)+' late</span>';
+  if(min<=-3)return '<span class="ontime">'+dur(-min)+' early</span>';
+  return '<span class="ontime">on time</span>';
+}
+function renderStopSelect(){
+  var ts=travelStops(state.dir),my=myIdx(),last=ts[ts.length-1];
+  if(my===last)my=ts[0];
+  state.my=R.stops[my].id;
+  $("stop").innerHTML=ts.filter(function(i){return i!==last}).map(function(i){
+    return '<option value="'+R.stops[i].id+'"'+(i===my?" selected":"")+'>'+esc(stopName(i))+'</option>';
+  }).join("");
+}
+function renderDirs(models){
+  document.querySelectorAll(".dirs button").forEach(function(b){
+    var d=+b.dataset.dir,c=models.filter(function(m){return m.dir===d&&!m.arrived}).length;
+    b.setAttribute("aria-pressed",d===state.dir);
+    b.querySelector(".cnt").textContent=c?" · "+c+" live":"";
+  });
+}
+function render(){
+  if(!R)return;
+  var models=live.map(model).filter(Boolean);
+  renderDirs(models);
+  var my=myIdx(),ts=travelStops(state.dir),myK=ts.indexOf(my);
+  var mine=models.filter(function(m){return m.dir===state.dir&&!(m.arrived&&m.old)});
+  mine.forEach(function(m){m.myEta=m.etas[myK];m.passed=m.myEta==null});
+  mine.sort(function(a,b){
+    var ra=a.arrived?3:a.passed?2:a.old?1:0, rb=b.arrived?3:b.passed?2:b.old?1:0;
+    if(ra!==rb)return ra-rb; return (a.myEta||0)-(b.myEta||0)||b.p-a.p;
+  });
+  $("livehint").textContent="towards "+(state.dir?"Narsipatnam":"Chodavaram");
+  $("live").innerHTML=mine.length?mine.map(function(m){return busCard(m,myK)}).join(""):
+    '<div class="card empty">No bus on this direction is sending GPS right now. Many APSRTC buses run with GPS off, so check the timetable below for the next scheduled bus.</div>';
+  renderLine(mine,my);
+  renderMap(models);
+  renderTimetable(mine,myK);
+}
+function busCard(m,myK){
+  var where;
+  if(m.arrived)where="Reached <strong>"+esc(stopName(m.ts[m.ts.length-1]))+"</strong>";
+  else if(m.waiting)where="At <strong>"+esc(stopName(m.ts[0]))+"</strong> bus stand · "+(now()<m.times[0]?"leaves ":"was due ")+clock(m.times[0]);
+  else if(m.near>=0)where="At <strong>"+esc(stopName(m.ts[m.near]))+"</strong>";
+  else where="Next stop <strong>"+esc(stopName(m.ts[m.next]))+"</strong> · "+dur((m.etas[m.next]-now())/60);
+  if(m.off>2)where+=" · off the usual road";
+  var eta=m.arrived?'<b>✓</b><span>arrived</span>':m.passed?'<b>—</b><span>passed your stop</span>':
+    '<b>'+esc(dur((m.myEta-now())/60))+'</b><span>at '+clock(m.myEta)+'</span>';
+  var meta=[];
+  if(!m.arrived&&!(m.waiting&&m.delay<3))meta.push(lateTxt(m.delay));
+  if(m.b.kmh!=null&&!m.old)meta.push(m.b.kmh+" km/h");
+  meta.push((m.old?"GPS lost · last seen ":"updated ")+ago(m.age));
+  return '<div class="card bus'+(m.arrived||m.passed||m.old?" dim":"")+'">'
+    +'<div class="t">'+esc(m.trip.no)+'<small>'+esc(m.b.bus||"")+'</small></div><div class="eta">'+eta+'</div>'
+    +'<div class="w">'+where+'</div><div class="m">'+meta.join(" · ")+'</div></div>';
+}
+function renderLine(mine,my){
+  var ts=travelStops(state.dir),tk=travelKm(state.dir),h="";
+  ts.forEach(function(i,k){
+    var at=mine.filter(function(m){return !m.arrived&&(m.near===k||(k===0&&m.waiting))});
+    h+='<div class="st'+(i===my?" me":"")+'" data-id="'+R.stops[i].id+'"><i></i><span class="n">'+esc(stopName(i))
+      +(at.length?"<br>"+at.map(chip).join(" "):"")+'</span><span class="tm">'+(k?Math.round(tk[k])+" km":"start")+'</span></div>';
+    if(k<ts.length-1){
+      var mid=mine.filter(function(m){return !m.arrived&&!m.waiting&&m.near<0&&m.p>tk[k]&&m.p<tk[k+1]});
+      if(mid.length)h+='<div class="gap">'+mid.map(chip).join("<br>")+'</div>';
+    }
+  });
+  $("line").innerHTML=h;
+}
+function chip(m){return '<span class="chip'+(m.old?" old":"")+'">'+esc(m.trip.no)+(m.old?"":" · "+(Math.round(m.delay)>=3?Math.round(m.delay)+"m late":"on time"))+'</span>'}
+
+function renderTimetable(mine,myK){
+  var nowM=istMin(),rows=[],liveIds={};
+  mine.forEach(function(m){liveIds[m.trip.id]=m});
+  R.trips.filter(function(t){return t.dir===state.dir}).forEach(function(t){
+    var m=hm(t.t[myK]),late=t.late[myK],lm=liveIds[t.id];
+    var expect=m+(late>0?late:0);
+    rows.push({t:t,m:m,late:late,lm:lm,gone:!lm&&expect<nowM-5});
+  });
+  rows.sort(function(a,b){return a.m-b.m});
+  var upcoming=rows.filter(function(r){return !r.gone});
+  var list=showAll?rows:upcoming.slice(0,8);
+  $("tthint").textContent="at "+stopName(travelStops(state.dir)[myK]);
+  $("tt").innerHTML=list.length?list.map(function(r){
+    var s;
+    if(r.lm){s=r.lm.arrived?"arrived":r.lm.passed?"passed your stop":"live · "+clock(r.lm.myEta)}
+    else if(r.late!=null&&r.late>=3)s="usually ~"+dur(r.late)+" late";
+    else if(r.late!=null)s="usually on time";
+    else s="";
+    return '<tr class="'+(r.gone?"dim":"")+'"><td class="tt">'+clockM(r.m).replace(" ","&nbsp;")+'</td><td>'+esc(r.t.no)
+      +(r.lm?'<span class="tag">LIVE</span>':"")+(r.t.type!=="PALLEVELUGU"?'<span class="tag u">'+esc(title(r.t.type))+'</span>':"")
+      +'</td><td class="s">'+s+'</td></tr>';
+  }).join(""):'<tr><td class="empty">No more scheduled buses today from this stop. First bus tomorrow: '+(rows[0]?clockM(rows[0].m):"–")+'</td></tr>';
+  $("more").textContent=showAll?"Show upcoming only":"Show full day ("+rows.length+" buses)";
+}
+
+/* ---------- map ---------- */
+var map=null,busLayer=null;
+function initMap(){
+  if(!window.L){$("map").innerHTML='<p class="empty" style="padding:16px">Map could not load.</p>';return}
+  map=L.map("map",{zoomControl:true,attributionControl:true,scrollWheelZoom:false});
+  L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png",{maxZoom:18,attribution:'© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'}).addTo(map);
+  var css=getComputedStyle(document.documentElement);
+  var line=L.polyline(R.shape,{color:css.getPropertyValue("--bus").trim()||"#0f7a52",weight:5,opacity:.75}).addTo(map);
+  R.stops.forEach(function(s){
+    L.circleMarker([s.lat,s.lon],{radius:5,color:"#11241c",weight:2,fillColor:"#fff",fillOpacity:1}).bindTooltip(title(s.n)).addTo(map);
+  });
+  map.fitBounds(line.getBounds(),{padding:[20,20]});
+  busLayer=L.layerGroup().addTo(map);
+}
+function renderMap(models){
+  if(!map)return;
+  busLayer.clearLayers();
+  models.forEach(function(m){
+    if(m.arrived&&m.old)return;
+    var dimmed=m.dir!==state.dir||m.old;
+    var icon=L.divIcon({className:"",iconSize:null,html:'<span class="bm'+(dimmed?" old":"")+'">'+(m.dir?"◀ ":"")+esc(m.trip.no)+(m.dir?"":" ▶")+'</span>'});
+    L.marker([m.b.lat,m.b.lon],{icon:icon,zIndexOffset:dimmed?0:1000}).bindPopup(
+      "<b>"+esc(m.trip.no)+"</b> "+esc(m.b.bus||"")+"<br>to "+(m.dir?"Narsipatnam":"Chodavaram")+"<br>"+ago(m.age)
+    ).addTo(busLayer);
+  });
+}
+
+/* ---------- data ---------- */
+function status(ok,t){$("stat").className="stat "+(ok?"ok":"bad");$("msg").textContent=t}
+function load(){
+  return fetch("/api/live",{cache:"no-store"}).then(function(r){if(!r.ok)throw new Error(r.status);return r.json()}).then(function(d){
+    live=d.buses||[];feedTime=d.feedTime;lastOk=now();
+    var fresh=feedTime?now()-feedTime:null;
+    if(fresh!=null&&fresh>180)status(false,"Live feed is delayed (last update "+ago(fresh)+")");
+    else status(true,"Live · updated "+(fresh!=null?ago(fresh):"just now"));
+    render();
+  }).catch(function(){
+    status(false,lastOk?"Connection problem. Showing data from "+ago(now()-lastOk)+". Retrying…":"Could not reach the live feed. Retrying…");
+    render();
+  });
+}
+var timer=null;
+function schedule(){clearInterval(timer);timer=setInterval(function(){if(!document.hidden)load()},POLL_MS)}
+document.addEventListener("visibilitychange",function(){if(!document.hidden){load();schedule()}});
+setInterval(function(){if(!document.hidden)render()},30000);
+
+document.querySelector(".dirs").addEventListener("click",function(e){
+  var b=e.target.closest("button");if(!b)return;
+  var d=+b.dataset.dir;if(d===state.dir)return;
+  // keep the same stop when switching, unless it is the new direction's last stop
+  state.dir=d;localStorage.setItem("nc.dir",d);renderStopSelect();localStorage.setItem("nc.my",state.my);render();
+});
+$("stop").addEventListener("change",function(){state.my=this.value;localStorage.setItem("nc.my",state.my);render()});
+$("line").addEventListener("click",function(e){
+  var s=e.target.closest(".st");if(!s)return;
+  var ts=travelStops(state.dir),last=R.stops[ts[ts.length-1]].id;
+  if(s.dataset.id===last)return;
+  state.my=s.dataset.id;localStorage.setItem("nc.my",state.my);$("stop").value=state.my;render();
+});
+$("re").addEventListener("click",load);
+$("more").addEventListener("click",function(){showAll=!showAll;render()});
+
+fetch("/route.json").then(function(r){return r.json()}).then(function(data){
+  R=data;R.trips.forEach(function(t){tripById[t.id]=t});
+  buildGeo();renderStopSelect();initMap();render();load();schedule();
+}).catch(function(){status(false,"Could not load route data. Please reload.")});
+})();
+</script>
+<link rel="stylesheet" href="theme.css">
+<script src="extras.js"></script>
+</body>
+</html>
