@@ -201,7 +201,7 @@
     by.innerHTML =
       '<img src="rakesh.jpg" alt="Rakesh" width="56" height="56">' +
       '<div><b>Built by Rakesh</b>' +
-      '<span>Made for kothakota pillalu..</span>' +
+      '<span>Made for kothakota students...</span>' +
       '<span>Dedicated to that orange dress girl i saw at sivalayam temple on nov 20 night🫠...</span>' +
       '<span>Any queries? <a href="tel:9494882167">Msg / call 9494882167</a></span></div>';
     var img = by.querySelector("img");
