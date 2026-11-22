@@ -36,3 +36,27 @@ async function load() {
       ts: Number(v.timestamp) || null,
     })
   }
+  
+return JSON.stringify({ feedTime: Number(d.header && d.header.timestamp) || null, buses })
+}
+
+function json(body, status, extra = {}) {
+  return new Response(body, {
+    status,
+    headers: { 'content-type': 'application/json; charset=utf-8', 'access-control-allow-origin': '*', ...extra },
+  })
+}
+
+export async function GET() {
+  if (!cache || Date.now() - cache.at > FRESH_MS) {
+    inflight = inflight || load()
+      .then((body) => (cache = { at: Date.now(), body }))
+      .finally(() => (inflight = null))
+    try {
+      await inflight
+    } catch (err) {
+      if (!cache) return json(JSON.stringify({ error: 'Live feed unavailable' }), 502, { 'cache-control': 'no-store' })
+    }
+  }
+  return json(cache.body, 200, { 'cache-control': 'public, s-maxage=10, stale-while-revalidate=30' })
+}
