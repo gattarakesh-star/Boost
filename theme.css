@@ -1,11 +1,54 @@
-/* Blue theme + byline. Loaded after the page's own styles, so these values win. */
-:root{--bg:#eef1fa;--ink:#141a33;--muted:#5f6683;--line:#cdd2e6;--soft:#f4f6fc;--bus:#2f46c9}
-header{background:#2f46c9}
-.dirs button[aria-pressed=true]{color:#1f2f8f}
-@media (prefers-color-scheme:dark){
-:root{--bg:#0d1226;--ink:#e8ebf8;--muted:#9aa3c7;--line:#2b3358;--card:#161d3a;--soft:#1b2345;--bus:#6a7ff2}
-header{background:#1f2f8f}
+/* Blue theme + byline + manual Auto/Light/Dark switch. Loaded after the page's own styles. */
+:root{
+  --bg:#eef1fa;--ink:#141a33;--muted:#5f6683;--line:#cdd2e6;
+  --card:#fff;--soft:#f4f6fc;--accent:#f2a900;--bus:#2f46c9;
+  --late:#b4480c;--bad:#c62828;color-scheme:light
 }
+header{padding-right:76px;background:#2f46c9}
+.dirs button[aria-pressed=true]{color:#1f2f8f}
+
+/* Manual DARK */
+html[data-theme=dark]{
+  --bg:#0d1226;--ink:#e8ebf8;--muted:#9aa3c7;--line:#2b3358;
+  --card:#161d3a;--soft:#1b2345;--accent:#f5b82e;--bus:#6a7ff2;
+  --late:#ff9a5c;--bad:#ff6b6b;color-scheme:dark
+}
+html[data-theme=dark] header{background:#1f2f8f}
+html[data-theme=dark] .dirs button[aria-pressed=true]{background:#e8ebf8;color:#1f2f8f}
+html[data-theme=dark] .st i{border-color:#9aa3c7}
+
+/* Manual LIGHT */
+html[data-theme=light]{
+  --bg:#eef1fa;--ink:#141a33;--muted:#5f6683;--line:#cdd2e6;
+  --card:#fff;--soft:#f4f6fc;--accent:#f2a900;--bus:#2f46c9;
+  --late:#b4480c;--bad:#c62828;color-scheme:light
+}
+html[data-theme=light] header{background:#2f46c9}
+html[data-theme=light] .dirs button[aria-pressed=true]{color:#1f2f8f}
+
+/* AUTO = follow the device (default until the user taps the button) */
+@media (prefers-color-scheme:dark){
+  html:not([data-theme]){
+    --bg:#0d1226;--ink:#e8ebf8;--muted:#9aa3c7;--line:#2b3358;
+    --card:#161d3a;--soft:#1b2345;--accent:#f5b82e;--bus:#6a7ff2;
+    --late:#ff9a5c;--bad:#ff6b6b;color-scheme:dark
+  }
+  html:not([data-theme]) header{background:#1f2f8f}
+  html:not([data-theme]) .dirs button[aria-pressed=true]{background:#e8ebf8;color:#1f2f8f}
+}
+
+/* Toggle button in the header */
+.theme-btn{
+  position:absolute;right:14px;top:14px;z-index:2;
+  border:0;border-radius:999px;padding:7px 11px;
+  background:rgba(255,255,255,.16);color:#fff;
+  font:600 13px system-ui;cursor:pointer;line-height:1
+}
+.theme-btn:active{transform:scale(.96)}
+html[data-theme=light] .theme-btn{background:rgba(31,47,143,.12);color:#1f2f8f}
+html[data-theme=dark] .theme-btn{background:rgba(255,255,255,.16);color:#e8ebf8}
+
+/* Byline */
 .by{display:flex;align-items:center;gap:12px;margin-top:28px;padding:14px 16px;background:var(--card);border-radius:16px}
 .by img{width:56px;height:56px;border-radius:50%;object-fit:cover;flex:none;background:var(--soft)}
 .by b{display:block}
