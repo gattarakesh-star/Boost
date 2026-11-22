@@ -342,8 +342,8 @@ $("line").addEventListener("click",function(e){
 });
 $("re").addEventListener("click",load);
 $("more").addEventListener("click",function(){showAll=!showAll;render()});
+fetch("/route.json").then(function(r){return r.text()}).then(function(t){return JSON.parse(t.replace(/[\r\n]/g,""))}).then(function(data){
 
-fetch("/route.json").then(function(r){return r.json()}).then(function(data){
   R=data;R.trips.forEach(function(t){tripById[t.id]=t});
   buildGeo();renderStopSelect();initMap();render();load();schedule();
 }).catch(function(){status(false,"Could not load route data. Please reload.")});
