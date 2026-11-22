@@ -359,6 +359,7 @@ fetch("/route.json").then(function(r){return r.text()}).then(function(t){return 
   R=data;R.trips.forEach(function(t){tripById[t.id]=t});
   buildGeo();renderStopSelect();initMap();render();load();schedule();
 }).catch(function(){status(false,"Could not load route data. Please reload.")});
+})();
 </script>
 <link rel="stylesheet" href="theme.css">
 <script src="extras.js"></script>
