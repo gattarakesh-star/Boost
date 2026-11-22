@@ -116,3 +116,28 @@
   p.innerHTML = 'Any queries? <a href="tel:9494882167">Msg / call 9494882167</a>';
   f.appendChild(p);
 })();
+
+// Hide the decorative route line on the map (the blue line).
+// Bus markers, stop dots and ETAs keep working normally.
+(function () {
+  var s = document.createElement("style");
+  s.textContent = '.leaflet-overlay-pane path[stroke-width="5"],.leaflet-overlay-pane path[stroke-opacity="0.75"]{display:none!important}';
+  document.head.appendChild(s);
+})();
+// Decorate the Narsipatnam ⇄ Chodavaram route line: green with a soft glow.
+// Append AFTER the previous "hide blue line" snippet so it overrides it.
+(function () {
+  var s = document.createElement("style");
+  s.textContent = '.leaflet-overlay-pane path[stroke-width="5"],.leaflet-overlay-pane path[stroke-opacity="0.75"]{' +
+    'display:block!important;' +
+    'stroke:#12a267!important;' +
+    'stroke-width:6!important;' +
+    'stroke-opacity:.95!important;' +
+    'stroke-linecap:round!important;' +
+    'stroke-linejoin:round!important;' +
+    'stroke-dasharray:none!important;' +
+    'filter:drop-shadow(0 0 3px rgba(18,162,103,.95)) drop-shadow(0 0 9px rgba(18,162,103,.55));' +
+    '}';
+  document.head.appendChild(s);
+})();
+
