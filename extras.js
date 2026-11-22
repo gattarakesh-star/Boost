@@ -202,7 +202,7 @@
       '<img src="rakesh.jpg" alt="Rakesh" width="56" height="56">' +
       '<div><b>Built by Rakesh</b>' +
       '<span>Made for kothakota pillalu..</span>' +
-      '<span>Dedicated to that girl orange dress i saw at sivalayam temple on nov 20 night🫠...</span>' +
+      '<span>Dedicated to that orange dress girl i saw at sivalayam temple on nov 20 night🫠...</span>' +
       '<span>Any queries? <a href="tel:9494882167">Msg / call 9494882167</a></span></div>';
     var img = by.querySelector("img");
     if (img) img.onerror = function () { this.style.display = "none"; };
