@@ -55,3 +55,55 @@
 
   apply();
 })();
+
+
+// Show only the first 3 live buses, with a "See more" button for the rest.
+// Re-applies itself whenever the page re-renders the live list (every ~15s).
+(function () {
+  var live = document.getElementById("live");
+  if (!live) return;
+
+  var LIMIT = 3;
+  var KEY = "nc.liveMore";
+  var expanded = localStorage.getItem(KEY) === "1";
+  var btn = null;
+
+  function trim() {
+    var cards = [].slice.call(live.querySelectorAll(".bus"));
+    var extra = cards.slice(LIMIT);
+
+    var attached = btn && live.contains && live.contains(btn);
+
+    if (!extra.length) {
+      if (attached) live.removeChild(btn);
+      btn = null;
+      cards.forEach(function (c) { if (c.style.display) c.style.display = ""; });
+      return;
+    }
+
+    if (!attached) {
+      btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "more live-more";
+      btn.addEventListener("click", function () {
+        expanded = !expanded;
+        localStorage.setItem(KEY, expanded ? "1" : "0");
+        trim();
+      });
+      live.appendChild(btn);
+    }
+
+    var label = expanded ? "Show less" : "See more (" + extra.length + " more)";
+    if (btn.textContent !== label) btn.textContent = label;
+
+    cards.forEach(function (c, i) {
+      var want = !expanded && i >= LIMIT ? "none" : "";
+      if (c.style.display !== want) c.style.display = want;
+    });
+  }
+
+  if (window.MutationObserver) {
+    new window.MutationObserver(function () { trim(); }).observe(live, { childList: true });
+  }
+  trim();
+})();
