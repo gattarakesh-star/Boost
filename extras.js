@@ -141,3 +141,101 @@
   document.head.appendChild(s);
 })();
 
+// Final byline (dedication + contact) and a crown beside Kothakota.
+(function () {
+  var css = document.createElement("style");
+  css.textContent = '.by div span{display:block;margin-top:2px}.by a{color:var(--bus);font-weight:600}';
+  document.head.appendChild(css);
+
+  var by = document.querySelector(".by");
+  if (by) {
+    by.innerHTML =
+      '<img src="rakesh.jpg" alt="Rakesh" width="56" height="56">' +
+      '<div><b>Built by Rakesh</b>' +
+      '<span>Made for narsipatnam chodavaram pillalu..</span>' +
+      '<span>Dedicated to that girl i saw at sivalayam temple in orange dress..</span>' +
+      '<span>Any queries? <a href="tel:9494882167">Msg / call 9494882167</a></span></div>';
+    var img = by.querySelector("img");
+    if (img) img.onerror = function () { this.style.display = "none"; };
+  }
+
+  // Remove the older standalone contact paragraph if it is still there.
+  [].slice.call(document.querySelectorAll("footer p")).forEach(function (p) {
+    if (/Any queries/i.test(p.textContent)) p.parentNode.removeChild(p);
+  });
+
+  // Crown beside Kothakota everywhere it appears (route line, timetable, tooltips).
+  var CROWN = " \uD83D\uDC51";
+  function crown(root) {
+    if (!root || !root.querySelectorAll) return;
+    var w = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, null, false);
+    var hits = [], t;
+    while ((t = w.nextNode())) {
+      if (t.nodeValue && /Kothakota/i.test(t.nodeValue) && t.nodeValue.indexOf("\uD83D\uDC51") < 0) hits.push(t);
+    }
+    hits.forEach(function (t) { t.nodeValue = t.nodeValue.replace(/(Kothakota)/gi, "$1" + CROWN); });
+  }
+  crown(document.body);
+  if (window.MutationObserver) {
+    new window.MutationObserver(function (ms) {
+      ms.forEach(function (m) {
+        [].slice.call(m.addedNodes).forEach(function (n) {
+          if (n.nodeType === 1) crown(n);
+          else if (n.nodeType === 3 && /Kothakota/i.test(n.nodeValue) && n.nodeValue.indexOf("\uD83D\uDC51") < 0) {
+            n.nodeValue = n.nodeValue.replace(/(Kothakota)/gi, "$1" + CROWN);
+          }
+        });
+      });
+    }).observe(document.body, { childList: true, subtree: true });
+  }
+})();
+
+// Final byline (dedication + contact) and a crown beside Kothakota.
+(function () {
+  var css = document.createElement("style");
+  css.textContent = '.by div span{display:block;margin-top:2px}.by a{color:var(--bus);font-weight:600}';
+  document.head.appendChild(css);
+
+  var by = document.querySelector(".by");
+  if (by) {
+    by.innerHTML =
+      '<img src="rakesh.jpg" alt="Rakesh" width="56" height="56">' +
+      '<div><b>Built by Rakesh</b>' +
+      '<span>Made for narsipatnam chodavaram pillalu..</span>' +
+      '<span>Dedicated to that girl i saw at sivalayam temple in orange dress..</span>' +
+      '<span>Any queries? <a href="tel:9494882167">Msg / call 9494882167</a></span></div>';
+    var img = by.querySelector("img");
+    if (img) img.onerror = function () { this.style.display = "none"; };
+  }
+
+  // Remove the older standalone contact paragraph if it is still there.
+  [].slice.call(document.querySelectorAll("footer p")).forEach(function (p) {
+    if (/Any queries/i.test(p.textContent)) p.parentNode.removeChild(p);
+  });
+
+  // Crown beside Kothakota everywhere it appears (route line, timetable, tooltips).
+  var CROWN = " \uD83D\uDC51";
+  function crown(root) {
+    if (!root || !root.querySelectorAll) return;
+    var w = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, null, false);
+    var hits = [], t;
+    while ((t = w.nextNode())) {
+      if (t.nodeValue && /Kothakota/i.test(t.nodeValue) && t.nodeValue.indexOf("\uD83D\uDC51") < 0) hits.push(t);
+    }
+    hits.forEach(function (t) { t.nodeValue = t.nodeValue.replace(/(Kothakota)/gi, "$1" + CROWN); });
+  }
+  crown(document.body);
+  if (window.MutationObserver) {
+    new window.MutationObserver(function (ms) {
+      ms.forEach(function (m) {
+        [].slice.call(m.addedNodes).forEach(function (n) {
+          if (n.nodeType === 1) crown(n);
+          else if (n.nodeType === 3 && /Kothakota/i.test(n.nodeValue) && n.nodeValue.indexOf("\uD83D\uDC51") < 0) {
+            n.nodeValue = n.nodeValue.replace(/(Kothakota)/gi, "$1" + CROWN);
+          }
+        });
+      });
+    }).observe(document.body, { childList: true, subtree: true });
+  }
+})();
+
