@@ -107,3 +107,12 @@
   }
   trim();
 })();
+
+// Contact line for any queries
+(function () {
+  var f = document.querySelector("footer");
+  if (!f) return;
+  var p = document.createElement("p");
+  p.innerHTML = 'Any queries? <a href="tel:9494882167">Msg / call 9494882167</a>';
+  f.appendChild(p);
+})();
