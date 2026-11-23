@@ -2,15 +2,15 @@
 // NOTE: serverless instances are ephemeral — counters reset on cold starts/redeploys.
 let views = 0
 let viewDay = ''
+const countedIds = new Set()
 const viewers = new Map()
 const reviews = []
 const TTL = 60000
 // Views reset every day at midnight IST (UTC+5:30).
 function resetViewsIfNeeded() {
   const day = new Date(Date.now() + 330 * 60000).toISOString().slice(0, 10)
-  if (viewDay !== day) { viewDay = day; views = 0 }
+  if (viewDay !== day) { viewDay = day; views = 0; countedIds.clear() }
 }
-
 function json(body, status = 200) {
   return new Response(JSON.stringify(body), {
     status,
@@ -43,8 +43,7 @@ export async function GET(request) {
 export async function POST(request) {
   let body = {}
   try { body = await request.json() } catch { return json({ error: 'invalid json' }, 400) }
-
-  if (body.action === 'view' || body.action === 'ping') {
+if (body.action === 'view' && !countedIds.has(id)) { countedIds.add(id); views++ }
     const id = String(body.id || '').slice(0, 80)
     if (!id) return json({ error: 'missing id' }, 400)
     resetViewsIfNeeded()
