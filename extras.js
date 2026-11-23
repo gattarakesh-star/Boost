@@ -447,7 +447,7 @@
 })();
 
 
-// Background song: auto-starts, with a floating button to pause/unmute.
+// Background song — Chrome blocks sound autoplay, so the first tap anywhere starts it.
 (function () {
   var SRC = "/song.mp3";
   var KEY = "nc.music";
@@ -462,10 +462,14 @@
 
   var css = document.createElement("style");
   css.textContent =
-    '.music-btn{position:fixed;right:14px;bottom:18px;z-index:9999;width:46px;height:46px;' +
+    '.music-btn{position:fixed;right:14px;bottom:18px;z-index:10000;width:46px;height:46px;' +
     'border:0;border-radius:50%;background:var(--bus,#2f46c9);color:#fff;font-size:20px;' +
-    'box-shadow:0 4px 14px rgba(0,0,0,.3);cursor:pointer;display:flex;' +
-    'align-items:center;justify-content:center}';
+    'box-shadow:0 4px 14px rgba(0,0,0,.3);cursor:pointer;display:flex;align-items:center;justify-content:center}' +
+    '.music-tip{position:fixed;left:50%;bottom:76px;transform:translateX(-50%);z-index:10000;' +
+    'background:var(--card,#fff);color:var(--ink,#222);border:2px solid var(--line,#ddd);' +
+    'border-radius:999px;padding:9px 16px;font:700 14px system-ui;white-space:nowrap;' +
+    'box-shadow:0 4px 16px rgba(0,0,0,.25);cursor:pointer}' +
+    '.music-tip[hidden]{display:none}';
   document.head.appendChild(css);
 
   var btn = document.createElement("button");
@@ -474,48 +478,90 @@
   btn.setAttribute("aria-label", "Toggle music");
   document.body.appendChild(btn);
 
+  var tip = document.createElement("div");
+  tip.className = "music-tip";
+  tip.textContent = "🎵 Tap anywhere to start music";
+  document.body.appendChild(tip);
+
+  function showTip(v) { tip.hidden = !v; }
+
   function paint() {
-    if (state === "off") { btn.textContent = "🔇"; btn.title = "Music off — tap to play"; }
-    else if (a.paused) { btn.textContent = "🎵"; btn.title = "Tap to play music"; }
-    else if (a.muted) { btn.textContent = "🔈"; btn.title = "Tap anywhere to unmute"; }
-    else { btn.textContent = "🎶"; btn.title = "Music playing — tap to pause"; }
+    if (state === "off") btn.textContent = "🔇";
+    else if (a.paused) btn.textContent = "🎵";
+    else if (a.muted) btn.textContent = "🔈";
+    else btn.textContent = "🎶";
   }
 
-  function start(unmute) {
-    if (state === "off") return;
-    if (unmute) a.muted = false;
-    var p = a.play();
-    if (p && p.catch) p.catch(function () {
-      a.muted = true;
-      a.play().catch(function () {});
+  function attempt(mute) {
+    a.muted = mute;
+    var p;
+    try { p = a.play(); } catch (e) { return Promise.resolve(false); }
+    if (!p || !p.then) return Promise.resolve(true);
+    return p.then(function () { return true; }, function () {
+      if (!mute) {
+        a.muted = true;
+        try { p = a.play(); } catch (e) { return Promise.resolve(false); }
+        return p && p.then ? p.then(function () { return true; }, function () { return false; }) : Promise.resolve(true);
+      }
+      return false;
     });
-    paint();
   }
 
-  if (state !== "off") start(false);
-
-  function firstTap() {
-    if (state === "off") return;
-    if (a.paused || a.muted) { a.muted = false; start(true); }
+  function afterStart(ok) {
     paint();
-    document.removeEventListener("touchstart", firstTap);
-    document.removeEventListener("click", firstTap);
+    showTip(state === "on" && (!ok || a.muted));
   }
-  document.addEventListener("touchstart", firstTap, { passive: true });
-  document.addEventListener("click", firstTap);
+
+  if (state === "on") attempt(false).then(afterStart);
+  else { a.paused = true; showTip(false); paint(); }
+
+  function removeKick() {
+    document.removeEventListener("pointerdown", kick, true);
+    document.removeEventListener("touchend", kick, true);
+    document.removeEventListener("click", kick, true);
+    document.removeEventListener("keydown", kick, true);
+  }
+
+  function kick() {
+    if (state !== "on") { showTip(false); removeKick(); return; }
+    attempt(false).then(function (ok) {
+      afterStart(ok);
+      if (ok && !a.muted) { showTip(false); removeKick(); }
+    });
+  }
+
+  ["pointerdown", "touchend", "click", "keydown"].forEach(function (ev) {
+    document.addEventListener(ev, kick, true);
+  });
 
   function stopBubble(e) { e.stopPropagation(); }
-  btn.addEventListener("touchstart", stopBubble, { passive: true });
+  btn.addEventListener("pointerdown", stopBubble);
+  btn.addEventListener("touchend", stopBubble);
   btn.addEventListener("click", function (e) {
     e.stopPropagation();
-    if (state === "off") { state = "on"; localStorage.setItem(KEY, "on"); start(true); }
-    else if (a.paused) { start(true); }
-    else if (a.muted) { a.muted = false; paint(); }
-    else { a.pause(); state = "off"; localStorage.setItem(KEY, "off"); paint(); }
+    if (state === "off") {
+      state = "on";
+      localStorage.setItem(KEY, "on");
+      attempt(false).then(afterStart);
+    } else if (a.paused) {
+      attempt(false).then(afterStart);
+    } else if (a.muted) {
+      a.muted = false;
+      showTip(false);
+      removeKick();
+      paint();
+    } else {
+      a.pause();
+      state = "off";
+      localStorage.setItem(KEY, "off");
+      showTip(false);
+      paint();
+    }
   });
 
   a.addEventListener("play", paint);
   a.addEventListener("pause", paint);
   a.addEventListener("volumechange", paint);
   paint();
+  if (state === "on") showTip(true);
 })();
