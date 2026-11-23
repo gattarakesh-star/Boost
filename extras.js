@@ -108,15 +108,6 @@
   trim();
 })();
 
-// Contact line for any queries
-(function () {
-  var f = document.querySelector("footer");
-  if (!f) return;
-  var p = document.createElement("p");
-  p.innerHTML = 'Any queries? <a href="tel:9494882167">Msg / call 9494882167</a>';
-  f.appendChild(p);
-})();
-
 // Hide the decorative route line on the map (the blue line).
 // Bus markers, stop dots and ETAs keep working normally.
 (function () {
@@ -139,55 +130,6 @@
     'filter:drop-shadow(0 0 3px rgba(18,162,103,.95)) drop-shadow(0 0 9px rgba(18,162,103,.55));' +
     '}';
   document.head.appendChild(s);
-})();
-
-// Final byline (dedication + contact) and a crown beside Kothakota.
-(function () {
-  var css = document.createElement("style");
-  css.textContent = '.by div span{display:block;margin-top:2px}.by a{color:var(--bus);font-weight:600}';
-  document.head.appendChild(css);
-
-  var by = document.querySelector(".by");
-  if (by) {
-    by.innerHTML =
-      '<img src="rakesh.jpg" alt="Rakesh" width="56" height="56">' +
-      '<div><b>Built by Rakesh</b>' +
-      '<span>Made for narsipatnam chodavaram pillalu..</span>' +
-      '<span>Dedicated to that girl i saw at sivalayam temple in orange dress..</span>' +
-      '<span>Any queries? <a href="tel:9494882167">Msg / call 9494882167</a></span></div>';
-    var img = by.querySelector("img");
-    if (img) img.onerror = function () { this.style.display = "none"; };
-  }
-
-  // Remove the older standalone contact paragraph if it is still there.
-  [].slice.call(document.querySelectorAll("footer p")).forEach(function (p) {
-    if (/Any queries/i.test(p.textContent)) p.parentNode.removeChild(p);
-  });
-
-  // Crown beside Kothakota everywhere it appears (route line, timetable, tooltips).
-  var CROWN = " \uD83D\uDC51";
-  function crown(root) {
-    if (!root || !root.querySelectorAll) return;
-    var w = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, null, false);
-    var hits = [], t;
-    while ((t = w.nextNode())) {
-      if (t.nodeValue && /Kothakota/i.test(t.nodeValue) && t.nodeValue.indexOf("\uD83D\uDC51") < 0) hits.push(t);
-    }
-    hits.forEach(function (t) { t.nodeValue = t.nodeValue.replace(/(Kothakota)/gi, "$1" + CROWN); });
-  }
-  crown(document.body);
-  if (window.MutationObserver) {
-    new window.MutationObserver(function (ms) {
-      ms.forEach(function (m) {
-        [].slice.call(m.addedNodes).forEach(function (n) {
-          if (n.nodeType === 1) crown(n);
-          else if (n.nodeType === 3 && /Kothakota/i.test(n.nodeValue) && n.nodeValue.indexOf("\uD83D\uDC51") < 0) {
-            n.nodeValue = n.nodeValue.replace(/(Kothakota)/gi, "$1" + CROWN);
-          }
-        });
-      });
-    }).observe(document.body, { childList: true, subtree: true });
-  }
 })();
 
 // Final byline (dedication + contact) and a crown beside Kothakota.
@@ -312,7 +254,9 @@
   }
 
   async function post(action, extra) {
-    var body = Object.assign({ action: action, id: vid }, extra || {});
+    var village = "";
+    try { village = localStorage.getItem("nc.my") || ""; } catch (e) {}
+    var body = Object.assign({ action: action, id: vid, village: village }, extra || {});
     var r = await fetch(API, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
     return r.json();
   }
@@ -321,8 +265,7 @@
     try { var d = await fetch(API, { cache: "no-store" }).then(function (r) { return r.json(); }); renderStats(d); renderReviews(d.reviews || []); } catch (e) {}
   }
 
-  
-// Count a view only once per browser per day (IST). Otherwise just ping as a live viewer.
+  // Count a view only once per browser per day (IST). Otherwise just ping as a live viewer.
   var countedKey = "nc.viewed." + today;
   var counted = false;
   try { counted = localStorage.getItem(countedKey) === "1"; } catch (e) {}
@@ -396,10 +339,10 @@
     body.hidden = !open;
     btn.textContent = open ? "🔒 Close admin" : "🔑 Manage reviews (admin)";
   }
-async function post(action, extra) {
-    var village = "";
-    try { village = localStorage.getItem("nc.my") || ""; } catch (e) {}
-    var body = Object.assign({ action: action, id: vid, village: village }, extra || {});
+
+  async function load() {
+    try {
+      var d = await fetch(API + "?type=reviews", { cache: "no-store" }).then(function (r) { return r.json(); });
       var list = d.reviews || [];
       sel.innerHTML = list.length
         ? list.map(function (r) {
@@ -456,6 +399,7 @@ async function post(action, extra) {
   var a = document.createElement("audio");
   a.src = SRC;
   a.loop = true;
+  a.autoplay = true;
   a.preload = "auto";
   a.volume = 0.6;
   document.body.appendChild(a);
@@ -665,4 +609,3 @@ async function post(action, extra) {
     }
   });
 })();
-
