@@ -239,3 +239,111 @@
   }
 })();
 
+// Live viewers, views and passenger reviews.
+(function () {
+  var API = "/api/social";
+  var vid;
+  try {
+    vid = sessionStorage.getItem("nc.vid");
+    if (!vid) { vid = Math.random().toString(36).slice(2) + Date.now().toString(36); sessionStorage.setItem("nc.vid", vid); }
+  } catch (e) { vid = "anon-" + Math.random().toString(36).slice(2); }
+
+  function esc(s) {
+    return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) {
+      return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c];
+    });
+  }
+
+  var css = document.createElement("style");
+  css.textContent =
+    '.social-stats{display:flex;gap:14px;align-items:center;font-size:14px;color:var(--muted);margin:6px 2px 12px;flex-wrap:wrap}' +
+    '.social-stats b{color:var(--ink)}' +
+    '.reviews{margin-top:26px}' +
+    '.reviews h2{font-size:17px;margin:0 2px 10px}' +
+    '.reviews h2 span{font-size:13px;color:var(--muted);font-weight:500}' +
+    '.review-list{display:flex;flex-direction:column;gap:10px}' +
+    '.review{background:var(--card);border-radius:14px;padding:12px 14px}' +
+    '.review .who{font-weight:700;font-size:14px}' +
+    '.review .stars{color:var(--accent);font-size:14px;margin-left:6px}' +
+    '.review .txt{font-size:15px;margin-top:4px;white-space:pre-wrap;overflow-wrap:anywhere}' +
+    '.review .when{font-size:12px;color:var(--muted);margin-top:4px}' +
+    '.review-form{display:flex;flex-direction:column;gap:8px;margin-top:12px}' +
+    '.review-form input,.review-form select,.review-form textarea{font:600 15px system-ui;color:var(--ink);background:var(--card);border:2px solid var(--line);border-radius:12px;padding:10px;width:100%}' +
+    '.review-form textarea{min-height:84px;font-weight:400;resize:vertical}' +
+    '.review-form button{border:0;border-radius:12px;padding:11px;background:var(--bus);color:#fff;font:700 15px system-ui;cursor:pointer}' +
+    '.rv-msg{font-size:13px;color:var(--muted);min-height:16px;margin:0}';
+  document.head.appendChild(css);
+
+  var stat = document.getElementById("stat");
+  var bar = document.createElement("div");
+  bar.className = "social-stats";
+  bar.innerHTML = '<span>👥 <b id="liveViewers">…</b> live</span><span>👁 <b id="pageViews">…</b> views</span>';
+  if (stat && stat.parentNode) stat.parentNode.insertBefore(bar, stat.nextSibling);
+
+  var footer = document.querySelector("footer");
+  var sec = document.createElement("section");
+  sec.className = "reviews";
+  sec.innerHTML =
+    '<h2>Reviews <span>from passengers</span></h2>' +
+    '<div class="review-list" id="reviewList"><div class="review"><div class="txt">Loading reviews…</div></div></div>' +
+    '<form class="review-form" id="reviewForm">' +
+      '<input id="rvName" maxlength="40" placeholder="Your name (optional)">' +
+      '<select id="rvRating"><option value="5">★★★★★</option><option value="4">★★★★☆</option><option value="3">★★★☆☆</option><option value="2">★★☆☆☆</option><option value="1">★☆☆☆☆</option></select>' +
+      '<textarea id="rvText" maxlength="300" placeholder="Tell others about this bus tracker…" required></textarea>' +
+      '<button type="submit" id="rvBtn">Post review</button>' +
+      '<p class="rv-msg" id="rvMsg"></p>' +
+    '</form>';
+  if (footer && footer.parentNode) footer.parentNode.insertBefore(sec, footer);
+
+  function renderStats(d) {
+    var v = document.getElementById("liveViewers");
+    var p = document.getElementById("pageViews");
+    if (v) v.textContent = d.viewers == null ? "…" : d.viewers;
+    if (p) p.textContent = d.views == null ? "…" : d.views;
+  }
+
+  function renderReviews(list) {
+    var box = document.getElementById("reviewList");
+    if (!box) return;
+    if (!list || !list.length) { box.innerHTML = '<div class="review"><div class="txt">No reviews yet — be the first! 🚌</div></div>'; return; }
+    box.innerHTML = list.map(function (r) {
+      var rating = r.rating || 5;
+      var stars = "★".repeat(rating) + "☆".repeat(Math.max(0, 5 - rating));
+      var when = new Date(r.ts || Date.now()).toLocaleDateString("en-IN", { day: "numeric", month: "short" });
+      return '<div class="review"><div><span class="who">' + esc(r.name) + '</span><span class="stars">' + stars + '</span></div>' +
+        '<div class="txt">' + esc(r.text) + '</div><div class="when">' + esc(when) + '</div></div>';
+    }).join("");
+  }
+
+  async function post(action, extra) {
+    var body = Object.assign({ action: action, id: vid }, extra || {});
+    var r = await fetch(API, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
+    return r.json();
+  }
+
+  async function refresh() {
+    try { var d = await fetch(API, { cache: "no-store" }).then(function (r) { return r.json(); }); renderStats(d); renderReviews(d.reviews || []); } catch (e) {}
+  }
+
+  post("view").then(refresh).catch(refresh);
+  setInterval(function () { if (!document.hidden) { post("ping").catch(function () {}); refresh(); } }, 20000);
+
+  var form = document.getElementById("reviewForm");
+  if (form) form.addEventListener("submit", async function (e) {
+    e.preventDefault();
+    var text = document.getElementById("rvText").value.trim();
+    var msg = document.getElementById("rvMsg");
+    var btn = document.getElementById("rvBtn");
+    if (!text) return;
+    btn.disabled = true;
+    try {
+      var d = await post("review", { name: document.getElementById("rvName").value, text: text, rating: +document.getElementById("rvRating").value });
+      renderReviews(d.reviews || []);
+      document.getElementById("rvText").value = "";
+      msg.textContent = "Posted! Thanks ✨";
+      refresh();
+    } catch (err) { msg.textContent = "Could not post. Try again."; }
+    finally { btn.disabled = false; }
+  });
+})();
+
