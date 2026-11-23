@@ -59,7 +59,8 @@ export async function POST(request) {
     const id = String(body.id || '').slice(0, 80)
     if (!id) return json({ error: 'missing id' }, 400)
     resetViewsIfNeeded()
-    if (body.action === 'view' && !countedIds.has(id)) { countedIds.add(id); views++ }
+ // Any unique browser counts once a day — whether it loads or just pings.
+    if (!countedIds.has(id)) { countedIds.add(id); views++ }
     viewers.set(id, Date.now())
     return json(stats())
   }
