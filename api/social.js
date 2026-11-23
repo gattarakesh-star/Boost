@@ -7,6 +7,9 @@ const viewers = new Map()
 const reviews = []
 const TTL = 60000
 
+// Change this to your own secret if you want.
+const ADMIN_KEY = 'nc-admin-7f3a9d2e'
+
 // Views reset every day at midnight IST (UTC+5:30).
 function resetViewsIfNeeded() {
   const day = new Date(Date.now() + 330 * 60000).toISOString().slice(0, 10)
@@ -35,6 +38,10 @@ function stats() {
   return { views, viewers: viewers.size, reviews: reviews.length }
 }
 
+function isAdmin(body) {
+  return String(body.key || '') === ADMIN_KEY
+}
+
 export async function GET(request) {
   const type = new URL(request.url).searchParams.get('type') || 'all'
   const list = reviews.slice(-30).reverse()
@@ -45,6 +52,8 @@ export async function GET(request) {
 export async function POST(request) {
   let body = {}
   try { body = await request.json() } catch { return json({ error: 'invalid json' }, 400) }
+
+  if (body.action === 'admin-check') return json({ ok: isAdmin(body) })
 
   if (body.action === 'view' || body.action === 'ping') {
     const id = String(body.id || '').slice(0, 80)
@@ -66,6 +75,15 @@ export async function POST(request) {
     })
     if (reviews.length > 100) reviews.splice(0, reviews.length - 100)
     return json({ reviews: reviews.slice(-30).reverse() }, 201)
+  }
+
+  if (body.action === 'delete') {
+    if (!isAdmin(body)) return json({ error: 'not allowed' }, 403)
+    const id = String(body.reviewId || '')
+    const i = reviews.findIndex(function (r) { return r.id === id })
+    if (i < 0) return json({ error: 'review not found' }, 404)
+    reviews.splice(i, 1)
+    return json({ reviews: reviews.slice(-30).reverse() })
   }
 
   return json({ error: 'unknown action' }, 400)
