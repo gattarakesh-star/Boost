@@ -242,16 +242,13 @@
 // Live viewers, views and passenger reviews.
 (function () {
   var API = "/api/social";
+// One ID per browser (localStorage, shared by all tabs) so refreshes/tabs don't add views.
   var vid;
   try {
-    vid = sessionStorage.getItem("nc.vid");
-    if (!vid) { vid = Math.random().toString(36).slice(2) + Date.now().toString(36); sessionStorage.setItem("nc.vid", vid); }
+    vid = localStorage.getItem("nc.vid");
+    if (!vid) { vid = Math.random().toString(36).slice(2) + Date.now().toString(36); localStorage.setItem("nc.vid", vid); }
   } catch (e) { vid = "anon-" + Math.random().toString(36).slice(2); }
-
-  function esc(s) {
-    return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) {
-      return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c];
-    });
+  var today = new Date(Date.now() + 330 * 60000).toISOString().slice(0, 10);
   }
 
   var css = document.createElement("style");
@@ -326,6 +323,13 @@
   }
 
   post("view").then(refresh).catch(refresh);
+// Count a view only once per browser per day (IST). Otherwise just ping as a live viewer.
+  var countedKey = "nc.viewed." + today;
+  var counted = false;
+  try { counted = localStorage.getItem(countedKey) === "1"; } catch (e) {}
+  (counted ? post("ping") : post("view").then(function () {
+    try { localStorage.setItem(countedKey, "1"); } catch (e) {}
+  })).then(refresh).catch(refresh);
   setInterval(function () { if (!document.hidden) { post("ping").catch(function () {}); refresh(); } }, 20000);
 
   var form = document.getElementById("reviewForm");
