@@ -446,3 +446,76 @@
   });
 })();
 
+
+// Background song: auto-starts, with a floating button to pause/unmute.
+(function () {
+  var SRC = "/song.mp3";
+  var KEY = "nc.music";
+  var state = localStorage.getItem(KEY) || "on";
+
+  var a = document.createElement("audio");
+  a.src = SRC;
+  a.loop = true;
+  a.preload = "auto";
+  a.volume = 0.6;
+  document.body.appendChild(a);
+
+  var css = document.createElement("style");
+  css.textContent =
+    '.music-btn{position:fixed;right:14px;bottom:18px;z-index:9999;width:46px;height:46px;' +
+    'border:0;border-radius:50%;background:var(--bus,#2f46c9);color:#fff;font-size:20px;' +
+    'box-shadow:0 4px 14px rgba(0,0,0,.3);cursor:pointer;display:flex;' +
+    'align-items:center;justify-content:center}';
+  document.head.appendChild(css);
+
+  var btn = document.createElement("button");
+  btn.type = "button";
+  btn.className = "music-btn";
+  btn.setAttribute("aria-label", "Toggle music");
+  document.body.appendChild(btn);
+
+  function paint() {
+    if (state === "off") { btn.textContent = "🔇"; btn.title = "Music off — tap to play"; }
+    else if (a.paused) { btn.textContent = "🎵"; btn.title = "Tap to play music"; }
+    else if (a.muted) { btn.textContent = "🔈"; btn.title = "Tap anywhere to unmute"; }
+    else { btn.textContent = "🎶"; btn.title = "Music playing — tap to pause"; }
+  }
+
+  function start(unmute) {
+    if (state === "off") return;
+    if (unmute) a.muted = false;
+    var p = a.play();
+    if (p && p.catch) p.catch(function () {
+      a.muted = true;
+      a.play().catch(function () {});
+    });
+    paint();
+  }
+
+  if (state !== "off") start(false);
+
+  function firstTap() {
+    if (state === "off") return;
+    if (a.paused || a.muted) { a.muted = false; start(true); }
+    paint();
+    document.removeEventListener("touchstart", firstTap);
+    document.removeEventListener("click", firstTap);
+  }
+  document.addEventListener("touchstart", firstTap, { passive: true });
+  document.addEventListener("click", firstTap);
+
+  function stopBubble(e) { e.stopPropagation(); }
+  btn.addEventListener("touchstart", stopBubble, { passive: true });
+  btn.addEventListener("click", function (e) {
+    e.stopPropagation();
+    if (state === "off") { state = "on"; localStorage.setItem(KEY, "on"); start(true); }
+    else if (a.paused) { start(true); }
+    else if (a.muted) { a.muted = false; paint(); }
+    else { a.pause(); state = "off"; localStorage.setItem(KEY, "off"); paint(); }
+  });
+
+  a.addEventListener("play", paint);
+  a.addEventListener("pause", paint);
+  a.addEventListener("volumechange", paint);
+  paint();
+})();
