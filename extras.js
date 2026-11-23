@@ -396,10 +396,10 @@
     body.hidden = !open;
     btn.textContent = open ? "🔒 Close admin" : "🔑 Manage reviews (admin)";
   }
-
-  async function load() {
-    try {
-      var d = await fetch(API + "?type=reviews", { cache: "no-store" }).then(function (r) { return r.json(); });
+async function post(action, extra) {
+    var village = "";
+    try { village = localStorage.getItem("nc.my") || ""; } catch (e) {}
+    var body = Object.assign({ action: action, id: vid, village: village }, extra || {});
       var list = d.reviews || [];
       sel.innerHTML = list.length
         ? list.map(function (r) {
@@ -565,3 +565,104 @@
   paint();
   if (state === "on") showTip(true);
 })();
+
+// Village-wise views — admin report using each visitor's chosen stop as their village.
+(function () {
+  var API = "/api/social";
+  var KEY = "nc.adminKey";
+  var key = localStorage.getItem(KEY) || "";
+
+  function esc(s) {
+    return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) {
+      return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c];
+    });
+  }
+
+  var css = document.createElement("style");
+  css.textContent =
+    '.village-panel{margin:26px 2px}' +
+    '.village-panel h2{font-size:17px;margin:0 2px 8px}' +
+    '.village-panel h2 span{font-size:13px;color:var(--muted);font-weight:500}' +
+    '.village-panel h3{font-size:14px;margin:14px 0 6px;color:var(--muted)}' +
+    '.village-unlock{border:0;border-radius:12px;padding:9px 14px;background:var(--card);color:var(--ink);font:700 14px system-ui;cursor:pointer}' +
+    '.village-body{margin-top:10px}' +
+    '.village-body[hidden]{display:none}' +
+    '.village-row{position:relative;background:var(--card);border-radius:10px;padding:8px 10px;margin-bottom:6px;display:flex;' +
+    'justify-content:space-between;align-items:center;font-size:14px;overflow:hidden}' +
+    '.village-row i{position:absolute;left:0;bottom:0;height:3px;background:var(--bus);opacity:.7}' +
+    '.village-row span,.village-row b{position:relative}' +
+    '.village-msg{font-size:13px;color:var(--muted);margin:6px 0}';
+  document.head.appendChild(css);
+
+  var footer = document.querySelector("footer");
+  if (!footer) return;
+
+  var sec = document.createElement("section");
+  sec.className = "village-panel";
+  sec.innerHTML =
+    '<h2>📍 Village-wise views <span>from your stop</span></h2>' +
+    '<button type="button" class="village-unlock" id="villageUnlock">' +
+      (key ? "🔒 Show report" : "🔑 Unlock report (admin)") + '</button>' +
+    '<div class="village-body" id="villageBody" hidden>' +
+      '<div id="villageRows"><p class="village-msg">Loading…</p></div>' +
+    '</div>';
+  footer.parentNode.insertBefore(sec, footer);
+
+  var btn = document.getElementById("villageUnlock");
+  var body = document.getElementById("villageBody");
+  var rows = document.getElementById("villageRows");
+
+  function table(title, obj, icon) {
+    var entries = Object.keys(obj || {}).map(function (k) { return [k, obj[k]]; });
+    entries.sort(function (a, b) { return b[1] - a[1]; });
+    if (!entries.length) return '<h3>' + icon + ' ' + title + '</h3><p class="village-msg">No data yet.</p>';
+    var max = entries[0][1] || 1;
+    return '<h3>' + icon + ' ' + title + '</h3>' + entries.map(function (e) {
+      var pct = Math.max(4, Math.round(e[1] / max * 100));
+      return '<div class="village-row"><span>' + esc(e[0]) + '</span><b>' + e[1] + '</b>' +
+        '<i style="width:' + pct + '%"></i></div>';
+    }).join("");
+  }
+
+  function render(d) {
+    rows.innerHTML = table("Views today", d.viewsByVillage, "👁") + table("Watching now", d.liveByVillage, "👥");
+  }
+
+  async function load() {
+    try {
+      var r = await fetch(API, { cache: "no-store" });
+      if (!r.ok) throw new Error("bad");
+      render(await r.json());
+    } catch (e) {
+      rows.innerHTML = '<p class="village-msg">Could not load report.</p>';
+    }
+  }
+
+  btn.addEventListener("click", async function () {
+    if (!body.hidden) { body.hidden = true; btn.textContent = "🔒 Show report"; return; }
+    if (!key) {
+      var entered = window.prompt("Enter your admin key:");
+      if (!entered) return;
+      try {
+        var r = await fetch(API, {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ action: "admin-check", key: entered })
+        }).then(function (x) { return x.json(); });
+        if (!r.ok) { window.alert("Wrong key."); return; }
+        key = entered;
+        localStorage.setItem(KEY, key);
+      } catch (e) { rows.innerHTML = '<p class="village-msg">Could not verify key.</p>'; return; }
+    }
+    body.hidden = false;
+    btn.textContent = "🔒 Hide report";
+    rows.innerHTML = '<p class="village-msg">Loading…</p>';
+    load();
+    if (!window.__villageTimer) {
+      window.__villageTimer = setInterval(function () {
+        if (!document.hidden && !body.hidden) load();
+      }, 20000);
+    }
+  });
+})();
+
