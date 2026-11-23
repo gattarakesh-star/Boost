@@ -350,3 +350,99 @@
   });
 })();
 
+// Admin-only review deletion. Unlock with your secret key, then pick a review to remove.
+(function () {
+  var API = "/api/social";
+  var KEY = "nc.adminKey";
+  var key = localStorage.getItem(KEY) || "";
+
+  function esc(s) {
+    return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) {
+      return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c];
+    });
+  }
+
+  var css = document.createElement("style");
+  css.textContent =
+    '.admin-panel{margin:16px 2px}' +
+    '.admin-btn{border:0;border-radius:12px;padding:10px 14px;background:var(--card);color:var(--ink);font:700 14px system-ui;cursor:pointer}' +
+    '.admin-body{display:flex;flex-direction:column;gap:8px;margin-top:8px}' +
+    '.admin-body[hidden]{display:none}' +
+    '.admin-body select{font:15px system-ui;color:var(--ink);background:var(--card);border:2px solid var(--line);border-radius:12px;padding:10px;width:100%}' +
+    '.admin-body button{border:0;border-radius:12px;padding:10px;background:#d33;color:#fff;font:700 14px system-ui;cursor:pointer}' +
+    '.admin-msg{font-size:13px;color:var(--muted);margin:0}';
+  document.head.appendChild(css);
+
+  var footer = document.querySelector("footer");
+  if (!footer) return;
+
+  var box = document.createElement("section");
+  box.className = "admin-panel";
+  box.innerHTML =
+    '<button type="button" class="admin-btn" id="adminBtn">🔑 Manage reviews (admin)</button>' +
+    '<div class="admin-body" id="adminBody" hidden>' +
+      '<select id="adminSelect"></select>' +
+      '<button type="button" id="adminDelete">🗑 Delete selected review</button>' +
+      '<p class="admin-msg" id="adminMsg"></p>' +
+    '</div>';
+  footer.parentNode.insertBefore(box, footer);
+
+  var btn = document.getElementById("adminBtn");
+  var body = document.getElementById("adminBody");
+  var sel = document.getElementById("adminSelect");
+  var msg = document.getElementById("adminMsg");
+
+  function show(open) {
+    body.hidden = !open;
+    btn.textContent = open ? "🔒 Close admin" : "🔑 Manage reviews (admin)";
+  }
+
+  async function load() {
+    try {
+      var d = await fetch(API + "?type=reviews", { cache: "no-store" }).then(function (r) { return r.json(); });
+      var list = d.reviews || [];
+      sel.innerHTML = list.length
+        ? list.map(function (r) {
+            return '<option value="' + esc(r.id) + '">' + esc((r.name || "Anonymous") + " — " + String(r.text || "").slice(0, 60)) + '</option>';
+          }).join("")
+        : '<option value="">No reviews yet</option>';
+      msg.textContent = list.length ? list.length + " review(s) loaded." : "No reviews yet.";
+    } catch (e) { msg.textContent = "Could not load reviews."; }
+  }
+
+  btn.addEventListener("click", async function () {
+    if (!body.hidden) { show(false); return; }
+    if (!key) {
+      var entered = window.prompt("Enter your admin key:");
+      if (!entered) return;
+      try {
+        var r = await fetch(API, {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ action: "admin-check", key: entered })
+        }).then(function (x) { return x.json(); });
+        if (!r.ok) { window.alert("Wrong key."); return; }
+        key = entered;
+        localStorage.setItem(KEY, key);
+      } catch (e) { msg.textContent = "Could not verify key."; return; }
+    }
+    show(true);
+    load();
+  });
+
+  document.getElementById("adminDelete").addEventListener("click", async function () {
+    var id = sel.value;
+    if (!id) { msg.textContent = "Select a review first."; return; }
+    if (!window.confirm("Delete this review?")) return;
+    try {
+      var r = await fetch(API, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ action: "delete", key: key, reviewId: id })
+      });
+      if (!r.ok) { msg.textContent = "Could not delete."; return; }
+      location.reload();
+    } catch (e) { msg.textContent = "Could not delete."; }
+  });
+})();
+
