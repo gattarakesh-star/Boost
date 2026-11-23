@@ -249,7 +249,6 @@
     if (!vid) { vid = Math.random().toString(36).slice(2) + Date.now().toString(36); localStorage.setItem("nc.vid", vid); }
   } catch (e) { vid = "anon-" + Math.random().toString(36).slice(2); }
   var today = new Date(Date.now() + 330 * 60000).toISOString().slice(0, 10);
-  }
 
   var css = document.createElement("style");
   css.textContent =
@@ -322,7 +321,7 @@
     try { var d = await fetch(API, { cache: "no-store" }).then(function (r) { return r.json(); }); renderStats(d); renderReviews(d.reviews || []); } catch (e) {}
   }
 
-  post("view").then(refresh).catch(refresh);
+  
 // Count a view only once per browser per day (IST). Otherwise just ping as a live viewer.
   var countedKey = "nc.viewed." + today;
   var counted = false;
