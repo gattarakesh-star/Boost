@@ -394,8 +394,7 @@
 (function () {
   var SRC = "/song.mp3";
   var KEY = "nc.music";
-  var state = localStorage.getItem(KEY) || "on";
-
+  var state = sessionStorage.getItem(KEY) || "on";
   var a = document.createElement("audio");
   a.src = SRC;
   a.loop = true;
@@ -485,7 +484,7 @@
     e.stopPropagation();
     if (state === "off") {
       state = "on";
-      localStorage.setItem(KEY, "on");
+      sessionStorage.setItem(KEY, "on");
       attempt(false).then(afterStart);
     } else if (a.paused) {
       attempt(false).then(afterStart);
@@ -497,7 +496,7 @@
     } else {
       a.pause();
       state = "off";
-      localStorage.setItem(KEY, "off");
+      sessionStorage.setItem(KEY, "off");
       showTip(false);
       paint();
     }
