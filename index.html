@@ -192,10 +192,9 @@ function lateTxt(min){
   return '<span class="ontime">on time</span>';
 }
 function renderStopSelect(){
-  var ts=travelStops(state.dir),my=myIdx(),last=ts[ts.length-1];
-  if(my===last)my=ts[0];
+  var ts=travelStops(state.dir),my=myIdx();
   state.my=R.stops[my].id;
-  $("stop").innerHTML=ts.filter(function(i){return i!==last}).map(function(i){
+  $("stop").innerHTML=ts.map(function(i){
     return '<option value="'+R.stops[i].id+'"'+(i===my?" selected":"")+'>'+esc(stopName(i))+'</option>';
   }).join("");
 }
