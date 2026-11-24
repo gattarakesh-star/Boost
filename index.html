@@ -342,18 +342,68 @@ $("line").addEventListener("click",function(e){
 });
 $("re").addEventListener("click",load);
 $("more").addEventListener("click",function(){showAll=!showAll;render()});
-fetch("/route.json").then(function(r){return r.text()}).then(function(t){return JSON.parse(t.replace(/[\r\n]/g,""))}).then(function(data){
-  return fetch("/road.json").then(function(r){return r.json()}).then(function(road){
+// Linear-interpolate a 9-entry schedule/trip array onto all merged stops.
+// idx[k] = the new position of old entry k, in travel order (increasing).
+function expandTrip(arr, idx, N, isTime) {
+  var out = [];
+  for (var j = 0; j < N; j++) {
+    var exact = idx.indexOf(j);
+    if (exact >= 0) { out.push(arr[exact]); continue; }
+    var a = 0;
+    while (a < idx.length - 2 && idx[a + 1] < j) a++;
+    var b = a + 1;
+    var va = arr[a], vb = arr[b], ia = idx[a], ib = idx[b];
+    if (va == null || vb == null) { out.push(va == null ? vb : va); continue; }
+    var f = (j - ia) / (ib - ia);
+    if (!isTime) { out.push(Math.round(va + (vb - va) * f)); continue; }
+    var ma = hm(va), mb = hm(vb);
+    if (mb < ma) mb += 1440;
+    var m = Math.round(ma + (mb - ma) * f) % 1440;
+    out.push(("0" + Math.floor(m / 60)).slice(-2) + ":" + ("0" + (m % 60)).slice(-2));
+  }
+  return out;
+}
+
+fetch("/route.json").then(function (r) { return r.text() }).then(function (t) { return JSON.parse(t.replace(/[\r\n]/g, "")) }).then(function (data) {
+  return Promise.all([
+    fetch("/road.json").then(function (r) { return r.json() }),
+    fetch("/stops.json").then(function (r) { return r.json() }).catch(function () { return { stops: [] } })
+  ]).then(function (a) {
+    var road = a[0], extra = a[1].stops || [];
     if (road.shape && road.shape.length > 1) {
-      data.shape = road.shape
-      if (road.stopAt && road.stopAt.length === data.stops.length) data.stopAt = road.stopAt
+      data.shape = road.shape;
+      if (road.stopAt && road.stopAt.length === data.stops.length) data.stopAt = road.stopAt;
     }
-    return data
-  })
-}).then(function(data){
-  R=data;R.trips.forEach(function(t){tripById[t.id]=t});
-  buildGeo();renderStopSelect();initMap();render();load();schedule();
-}).catch(function(){status(false,"Could not load route data. Please reload.")});
+    if (extra.length && data.stopAt && data.stopAt.length === data.stops.length) {
+      var all = data.stops.map(function (s, i) {
+        return { id: s.id, n: s.n, lat: s.lat, lon: s.lon, at: data.stopAt[i] };
+      }).concat(extra.map(function (s) {
+        return { id: s.id, n: s.n, lat: s.lat, lon: s.lon, at: +s.at };
+      }));
+      all.sort(function (x, y) { return x.at - y.at });
+
+      var N = all.length;
+      var mapF = [];
+      all.forEach(function (s, j) {
+        for (var i = 0; i < data.stops.length; i++) {
+          if (data.stops[i].id === s.id) { mapF[i] = j; break; }
+        }
+      });
+      data.trips.forEach(function (t) {
+        var order = t.dir ? mapF.slice().reverse().map(function (j) { return N - 1 - j }) : mapF;
+        t.t = expandTrip(t.t, order, N, true);
+        t.late = expandTrip(t.late, order, N, false);
+      });
+
+      data.stops = all.map(function (s) { return { id: s.id, n: s.n, lat: s.lat, lon: s.lon } });
+      data.stopAt = all.map(function (s) { return s.at });
+    }
+    return data;
+  });
+}).then(function (data) {
+  R = data; R.trips.forEach(function (t) { tripById[t.id] = t });
+  buildGeo(); renderStopSelect(); initMap(); render(); load(); schedule();
+}).catch(function () { status(false, "Could not load route data. Please reload.") });
 })();
 </script>
 <link rel="stylesheet" href="theme.css">
