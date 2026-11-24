@@ -21,6 +21,20 @@ const VILLAGES = {
   '238004': 'Lopudi-Singavaram',
   '23385': 'Vaddadi',
   '225902': 'Chodavaram',
+  'x01': 'Pedda Boddepalli',
+  'x02': 'Rama Lakshmipuram',
+  'x03': 'Nindugonda',
+  'x04': 'Bogapuram',
+  'x05': 'Kanchugummala',
+  'x06': 'Macherlapalem',
+  'x07': 'Dondapudi',
+  'x08': 'Garnikam',
+  'x09': 'Medivada',
+  'x10': 'Buddiredlapalem',
+  'x11': 'Mukundapuram',
+  'x12': 'Vijayaramarajupeta',
+  'x13': 'Lakshmipuram',
+  'x14': 'Pakirsahebpeta',
 }
 
 function villageOf(raw) {
