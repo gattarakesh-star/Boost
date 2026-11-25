@@ -265,13 +265,8 @@
     try { var d = await fetch(API, { cache: "no-store" }).then(function (r) { return r.json(); }); renderStats(d); renderReviews(d.reviews || []); } catch (e) {}
   }
 
-  // Count a view only once per browser per day (IST). Otherwise just ping as a live viewer.
-  var countedKey = "nc.viewed." + today;
-  var counted = false;
-  try { counted = localStorage.getItem(countedKey) === "1"; } catch (e) {}
-  (counted ? post("ping") : post("view").then(function () {
-    try { localStorage.setItem(countedKey, "1"); } catch (e) {}
-  })).then(refresh).catch(refresh);
+  // Always announce a view on load; the server dedupes one view per browser per IST day.
+  post("view").then(refresh).catch(refresh);
   setInterval(function () { if (!document.hidden) { post("ping").catch(function () {}); refresh(); } }, 20000);
 
   var form = document.getElementById("reviewForm");
