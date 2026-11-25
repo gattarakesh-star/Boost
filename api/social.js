@@ -1,14 +1,9 @@
-// Tiny in-memory social stats + reviews for the bus tracker.
-// NOTE: serverless instances are ephemeral — counters reset on cold starts/redeploys.
-let views = 0
-let viewDay = ''
-const countedIds = new Map()
-const viewers = new Map()
-const reviews = []
-const TTL = 60000
-
-// Change this to your own secret if you want.
+// Persistent social stats + reviews, backed by Supabase REST.
+// Survives Vercel cold starts, redeploys and closing the tab.
+const SB_URL = 'https://nncpndzbcajasfkpyfiv.supabase.co'
+const SB_KEY = 'sb_publishable_sqOWZsOn8YFIH50KhhurrA_Jpp_rJoM'
 const ADMIN_KEY = 'nc-admin-7f3a9d2e'
+const TTL = 60000
 
 // Stop IDs used by the app double as village names.
 const VILLAGES = {
@@ -43,10 +38,8 @@ function villageOf(raw) {
   return VILLAGES[v] || v.slice(0, 40)
 }
 
-// Views reset every day at midnight IST (UTC+5:30).
-function resetViewsIfNeeded() {
-  const day = new Date(Date.now() + 330 * 60000).toISOString().slice(0, 10)
-  if (viewDay !== day) { viewDay = day; views = 0; countedIds.clear() }
+function dayIST() {
+  return new Date(Date.now() + 330 * 60000).toISOString().slice(0, 10)
 }
 
 function json(body, status = 200) {
@@ -60,82 +53,128 @@ function json(body, status = 200) {
   })
 }
 
-function prune() {
-  const t = Date.now()
-  for (const [id, v] of viewers) if (t - v.ts > TTL) viewers.delete(id)
+async function sb(path, opts = {}) {
+  const res = await fetch(SB_URL + '/rest/v1/' + path, {
+    method: opts.method || 'GET',
+    headers: Object.assign({
+      apikey: SB_KEY,
+      Authorization: 'Bearer ' + SB_KEY,
+      'content-type': 'application/json',
+    }, opts.headers || {}),
+    body: opts.body,
+    cache: 'no-store',
+  })
+  if (!res.ok) throw new Error('supabase ' + res.status + ': ' + (await res.text()).slice(0, 200))
+  return res
 }
 
-function countBy(map, getter) {
-  const out = {}
-  for (const value of map.values()) {
-    const k = getter(value) || 'Unknown'
-    out[k] = (out[k] || 0) + 1
+async function getRows(path) {
+  return (await sb(path)).json()
+}
+
+function publicReview(r) {
+  return {
+    id: r.id,
+    name: r.name || 'Anonymous',
+    text: r.body || '',
+    rating: r.rating || 5,
+    ts: Date.parse(r.ts) || Date.now(),
   }
+}
+
+async function reviewList() {
+  const rows = await getRows('nc_reviews?select=id,name,body,rating,ts&order=ts.desc&limit=30')
+  return rows.map(publicReview)
+}
+
+function countBy(list, getter) {
+  const out = {}
+  list.forEach(function (v) {
+    const k = getter(v) || 'Unknown'
+    out[k] = (out[k] || 0) + 1
+  })
   return out
 }
 
-function stats() {
-  resetViewsIfNeeded()
-  prune()
+async function stats() {
+  const day = dayIST()
+  const [vrows, viewers, reviews] = await Promise.all([
+    getRows('nc_views?select=village&day=eq.' + day),
+    getRows('nc_viewers?select=village,ts'),
+    reviewList(),
+  ])
+  const t = Date.now()
+  const live = viewers.filter(function (v) { return t - Date.parse(v.ts) < TTL })
   return {
-    views,
-    viewers: viewers.size,
+    views: vrows.length,
+    viewers: live.length,
     reviews: reviews.length,
-    viewsByVillage: countBy(countedIds, function (v) { return v }),
-    liveByVillage: countBy(viewers, function (v) { return v.village }),
+    viewsByVillage: countBy(vrows, function (v) { return v.village }),
+    liveByVillage: countBy(live, function (v) { return v.village }),
   }
 }
 
-function isAdmin(body) {
-  return String(body.key || '') === ADMIN_KEY
-}
-
 export async function GET(request) {
-  const type = new URL(request.url).searchParams.get('type') || 'all'
-  const list = reviews.slice(-30).reverse()
-  if (type === 'reviews') return json({ reviews: list })
-  return json({ ...stats(), reviews: list })
+  try {
+    const type = new URL(request.url).searchParams.get('type') || 'all'
+    const list = await reviewList()
+    if (type === 'reviews') return json({ reviews: list })
+    return json(Object.assign({}, await stats(), { reviews: list }))
+  } catch (e) {
+    return json({ views: 0, viewers: 0, reviews: [], error: 'stats unavailable' }, 502)
+  }
 }
 
 export async function POST(request) {
   let body = {}
   try { body = await request.json() } catch { return json({ error: 'invalid json' }, 400) }
 
-  if (body.action === 'admin-check') return json({ ok: isAdmin(body) })
+  try {
+    if (body.action === 'admin-check') return json({ ok: String(body.key || '') === ADMIN_KEY })
 
-  if (body.action === 'view' || body.action === 'ping') {
-    const id = String(body.id || '').slice(0, 80)
-    if (!id) return json({ error: 'missing id' }, 400)
-    const village = villageOf(body.village)
-    resetViewsIfNeeded()
-    // Any unique browser counts once a day — whether it loads or just pings.
-    if (!countedIds.has(id)) views++
-    countedIds.set(id, village)
-    viewers.set(id, { ts: Date.now(), village: village })
-    return json(stats())
+    if (body.action === 'view' || body.action === 'ping') {
+      const id = String(body.id || '').slice(0, 80)
+      if (!id) return json({ error: 'missing id' }, 400)
+      const village = villageOf(body.village)
+      if (body.action === 'view') {
+        await sb('nc_views?on_conflict=vid,day', {
+          method: 'POST',
+          headers: { Prefer: 'resolution=ignore-duplicates' },
+          body: JSON.stringify({ vid: id, day: dayIST(), village: village }),
+        })
+      }
+      await sb('nc_viewers?on_conflict=vid', {
+        method: 'POST',
+        headers: { Prefer: 'resolution=merge-duplicates' },
+        body: JSON.stringify({ vid: id, village: village, ts: new Date().toISOString() }),
+      })
+      return json(await stats())
+    }
+
+    if (body.action === 'review') {
+      const text = String(body.text || '').trim().slice(0, 300)
+      if (!text) return json({ error: 'empty review' }, 400)
+      const name = String(body.name || 'Anonymous').trim().slice(0, 40) || 'Anonymous'
+      const rating = Math.max(1, Math.min(5, Number(body.rating) || 5))
+      await sb('nc_reviews', {
+        method: 'POST',
+        body: JSON.stringify({
+          id: Date.now() + '-' + Math.random().toString(36).slice(2, 7),
+          name: name, body: text, rating: rating, ts: new Date().toISOString(),
+        }),
+      })
+      return json({ reviews: await reviewList() }, 201)
+    }
+
+    if (body.action === 'delete') {
+      if (String(body.key || '') !== ADMIN_KEY) return json({ error: 'not allowed' }, 403)
+      const id = String(body.reviewId || '')
+      await sb('nc_reviews?id=eq.' + encodeURIComponent(id), { method: 'DELETE' })
+      return json({ reviews: await reviewList() })
+    }
+
+    return json({ error: 'unknown action' }, 400)
+  } catch (e) {
+    return json({ error: 'database unavailable' }, 502)
   }
-
-  if (body.action === 'review') {
-    const text = String(body.text || '').trim().slice(0, 300)
-    if (!text) return json({ error: 'empty review' }, 400)
-    const name = String(body.name || 'Anonymous').trim().slice(0, 40) || 'Anonymous'
-    const rating = Math.max(1, Math.min(5, Number(body.rating) || 5))
-    reviews.push({
-      id: Date.now() + '-' + Math.random().toString(36).slice(2, 7),
-      name, text, rating, ts: Date.now(),
-    })
-    if (reviews.length > 100) reviews.splice(0, reviews.length - 100)
-    return json({ reviews: reviews.slice(-30).reverse() }, 201)
-  }
-
-  if (body.action === 'delete') {
-    if (!isAdmin(body)) return json({ error: 'not allowed' }, 403)
-    const id = String(body.reviewId || '')
-    const i = reviews.findIndex(function (r) { return r.id === id })
-    if (i < 0) return json({ error: 'review not found' }, 404)
-    reviews.splice(i, 1)
-    return json({ reviews: reviews.slice(-30).reverse() })
-  }
-
-  return json({ error: 'unknown action' }, 400)
 }
