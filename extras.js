@@ -197,6 +197,7 @@
     '.social-stats{display:flex;gap:14px;align-items:center;font-size:14px;color:var(--muted);margin:6px 2px 12px;flex-wrap:wrap}' +
     '.social-stats b{color:var(--ink)}' +
     '.flash-news{display:flex;align-items:center;gap:8px;margin:0 2px 12px;padding:9px 10px;border-radius:14px;border:2px solid #f2a900;background:linear-gradient(90deg,#fff6d8,#ffe3b8);color:#5a2b00;font:700 14px/1.35 system-ui;box-shadow:0 0 14px rgba(242,169,0,.35)}' +
+    '.flash-news[hidden]{display:none}' +
     '.flash-news .flash-text{flex:1;min-width:0;white-space:normal;overflow-wrap:anywhere;word-break:break-word;text-align:center}' +
     '.flash-news .alarm{font-size:18px;line-height:1;flex:none;filter:drop-shadow(0 0 5px #e33);animation:alarmBlink .8s ease-in-out infinite alternate}' +
     '.flash-news .alarm-r{animation-delay:.4s}' +
@@ -252,10 +253,12 @@
 
   function renderNews(n) {
     var el = document.getElementById("flashText");
+    var bar = document.getElementById("flashNews");
     if (!el) return;
     var text = typeof n === "string" ? n : (n && n.text) || "";
     text = String(text).trim();
     el.textContent = text ? text : "No flash news right now.";
+    if (bar) bar.hidden = !(typeof n === "string" || !n || n.on !== false);
   }
 
   function renderStats(d) {
@@ -341,6 +344,8 @@
     '.admin-body textarea{font:400 15px/1.35 system-ui;color:var(--ink);background:var(--card);border:2px solid var(--line);border-radius:12px;padding:10px;width:100%;min-height:76px;resize:vertical}' +
     '.admin-body button{border:0;border-radius:12px;padding:10px;background:#d33;color:#fff;font:700 14px system-ui;cursor:pointer}' +
     '.admin-body .save-news{background:var(--bus);color:#fff}' +
+    '.news-toggle{display:flex;align-items:center;gap:8px;font:600 14px system-ui;color:var(--ink)}' +
+    '.news-toggle input{width:18px;height:18px;accent-color:var(--bus)}' +
     '.admin-msg{font-size:13px;color:var(--muted);margin:0}';
   document.head.appendChild(css);
 
@@ -352,6 +357,7 @@
   box.innerHTML =
     '<button type="button" class="admin-btn" id="adminBtn">🔑 Manage reviews (admin)</button>' +
     '<div class="admin-body" id="adminBody" hidden>' +
+      '<label class="news-toggle"><input type="checkbox" id="adminNewsOn" checked> Show flash news on site</label>' +
       '<textarea id="adminNews" maxlength="500" placeholder="Flash news shown below live views…"></textarea>' +
       '<button type="button" class="save-news" id="adminSaveNews">📣 Save flash news</button>' +
       '<select id="adminSelect"></select>' +
@@ -382,6 +388,8 @@
       msg.textContent = list.length ? list.length + " review(s) loaded." : "No reviews yet.";
       var ta = document.getElementById("adminNews");
       if (ta) ta.value = (d.news && d.news.text) || "";
+      var tog = document.getElementById("adminNewsOn");
+      if (tog) tog.checked = !d.news || d.news.on !== false;
     } catch (e) { msg.textContent = "Could not load reviews."; }
   }
 
@@ -412,7 +420,12 @@
       var r = await fetch(API, {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ action: "set-news", key: key, text: text })
+        body: JSON.stringify({
+          action: "set-news",
+          key: key,
+          text: text,
+          on: document.getElementById("adminNewsOn").checked
+        })
       }).then(function (x) { return x.json(); });
       if (r.error) { msg.textContent = r.error; return; }
       msg.textContent = text ? "Flash news saved ✅" : "Flash news cleared ✅";
