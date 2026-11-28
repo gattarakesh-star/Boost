@@ -4,7 +4,7 @@ const SB_URL = 'https://nncpndzbcajasfkpyfiv.supabase.co'
 const SB_KEY = 'sb_publishable_sqOWZsOn8YFIH50KhhurrA_Jpp_rJoM'
 const ADMIN_KEY = 'nc-admin-7f3a9d2e'
 const TTL = 60000
-const NEWS_ID = 'main'
+const NEWS_ID = '__news__'
 const NEWS_MAX = 500
 
 // Stop IDs used by the app double as village names.
@@ -74,39 +74,30 @@ async function getRows(path) {
   return (await sb(path)).json()
 }
 
-// Flash news is a single row in nc_news. If the table is missing, stay silent
-// so views, viewers and reviews keep working.
+// Flash news is one reserved row inside the existing nc_reviews table.
+// No extra Supabase table is needed; reviewList() hides this row.
 async function readNews() {
   try {
-    let rows
-    try {
-      rows = await getRows('nc_news?select=msg,ts&id=eq.' + NEWS_ID + '&limit=1')
-    } catch (e) {
-      rows = await getRows('nc_news?select=text,ts&id=eq.' + NEWS_ID + '&limit=1')
-    }
+    const rows = await getRows('nc_reviews?select=body,ts&id=eq.' + NEWS_ID + '&limit=1')
     if (!rows.length) return { text: '', ts: 0 }
-    const row = rows[0]
-    return { text: String(row.msg || row.text || ''), ts: Date.parse(row.ts) || 0 }
+    return { text: String(rows[0].body || ''), ts: Date.parse(rows[0].ts) || 0 }
   } catch (e) {
     return { text: '', ts: 0 }
   }
 }
 
 async function writeNews(text) {
-  const ts = new Date().toISOString()
-  const opts = {
+  await sb('nc_reviews?on_conflict=id', {
     method: 'POST',
     headers: { Prefer: 'resolution=merge-duplicates' },
-  }
-  try {
-    await sb('nc_news?on_conflict=id', Object.assign({}, opts, {
-      body: JSON.stringify({ id: NEWS_ID, msg: text, ts: ts }),
-    }))
-  } catch (e) {
-    await sb('nc_news?on_conflict=id', Object.assign({}, opts, {
-      body: JSON.stringify({ id: NEWS_ID, text: text, ts: ts }),
-    }))
-  }
+    body: JSON.stringify({
+      id: NEWS_ID,
+      name: '__news__',
+      body: text,
+      rating: 5,
+      ts: new Date().toISOString(),
+    }),
+  })
 }
 
 function publicReview(r) {
@@ -120,7 +111,7 @@ function publicReview(r) {
 }
 
 async function reviewList() {
-  const rows = await getRows('nc_reviews?select=id,name,body,rating,ts&order=ts.desc&limit=30')
+  const rows = await getRows('nc_reviews?select=id,name,body,rating,ts&id=neq.__news__&order=ts.desc&limit=30')
   return rows.map(publicReview)
 }
 
@@ -209,7 +200,7 @@ export async function POST(request) {
       try {
         await writeNews(text)
       } catch (e) {
-        return json({ error: 'News table missing — create nc_news in Supabase.' }, 500)
+        return json({ error: 'Could not save news. Try again.' }, 500)
       }
       return json({ news: { text: text, ts: Date.now() } })
     }
