@@ -78,11 +78,34 @@ async function getRows(path) {
 // so views, viewers and reviews keep working.
 async function readNews() {
   try {
-    const rows = await getRows('nc_news?select=text,ts&id=eq.' + NEWS_ID + '&limit=1')
+    let rows
+    try {
+      rows = await getRows('nc_news?select=msg,ts&id=eq.' + NEWS_ID + '&limit=1')
+    } catch (e) {
+      rows = await getRows('nc_news?select=text,ts&id=eq.' + NEWS_ID + '&limit=1')
+    }
     if (!rows.length) return { text: '', ts: 0 }
-    return { text: String(rows[0].text || ''), ts: Date.parse(rows[0].ts) || 0 }
+    const row = rows[0]
+    return { text: String(row.msg || row.text || ''), ts: Date.parse(row.ts) || 0 }
   } catch (e) {
     return { text: '', ts: 0 }
+  }
+}
+
+async function writeNews(text) {
+  const ts = new Date().toISOString()
+  const opts = {
+    method: 'POST',
+    headers: { Prefer: 'resolution=merge-duplicates' },
+  }
+  try {
+    await sb('nc_news?on_conflict=id', Object.assign({}, opts, {
+      body: JSON.stringify({ id: NEWS_ID, msg: text, ts: ts }),
+    }))
+  } catch (e) {
+    await sb('nc_news?on_conflict=id', Object.assign({}, opts, {
+      body: JSON.stringify({ id: NEWS_ID, text: text, ts: ts }),
+    }))
   }
 }
 
@@ -184,11 +207,7 @@ export async function POST(request) {
       if (String(body.key || '') !== ADMIN_KEY) return json({ error: 'not allowed' }, 403)
       const text = String(body.text || '').trim().slice(0, NEWS_MAX)
       try {
-        await sb('nc_news?on_conflict=id', {
-          method: 'POST',
-          headers: { Prefer: 'resolution=merge-duplicates' },
-          body: JSON.stringify({ id: NEWS_ID, text: text, ts: new Date().toISOString() }),
-        })
+        await writeNews(text)
       } catch (e) {
         return json({ error: 'News table missing — create nc_news in Supabase.' }, 500)
       }
