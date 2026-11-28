@@ -78,15 +78,19 @@ async function getRows(path) {
 // No extra Supabase table is needed; reviewList() hides this row.
 async function readNews() {
   try {
-    const rows = await getRows('nc_reviews?select=body,ts&id=eq.' + NEWS_ID + '&limit=1')
-    if (!rows.length) return { text: '', ts: 0 }
-    return { text: String(rows[0].body || ''), ts: Date.parse(rows[0].ts) || 0 }
+    const rows = await getRows('nc_reviews?select=body,ts,rating&id=eq.' + NEWS_ID + '&limit=1')
+    if (!rows.length) return { text: '', ts: 0, on: true }
+    return {
+      text: String(rows[0].body || ''),
+      ts: Date.parse(rows[0].ts) || 0,
+      on: Number(rows[0].rating) !== 1,
+    }
   } catch (e) {
-    return { text: '', ts: 0 }
+    return { text: '', ts: 0, on: true }
   }
 }
 
-async function writeNews(text) {
+async function writeNews(text, on) {
   await sb('nc_reviews?on_conflict=id', {
     method: 'POST',
     headers: { Prefer: 'resolution=merge-duplicates' },
@@ -94,7 +98,7 @@ async function writeNews(text) {
       id: NEWS_ID,
       name: '__news__',
       body: text,
-      rating: 5,
+      rating: on ? 5 : 1,
       ts: new Date().toISOString(),
     }),
   })
@@ -149,7 +153,7 @@ export async function GET(request) {
     if (type === 'reviews') return json({ reviews: list, news: news })
     return json(Object.assign({}, await stats(), { reviews: list, news: news }))
   } catch (e) {
-    return json({ views: 0, viewers: 0, reviews: [], news: { text: '', ts: 0 }, error: 'stats unavailable' }, 502)
+    return json({ views: 0, viewers: 0, reviews: [], news: { text: '', ts: 0, on: true }, error: 'stats unavailable' }, 502)
   }
 }
 
@@ -198,7 +202,7 @@ export async function POST(request) {
       if (String(body.key || '') !== ADMIN_KEY) return json({ error: 'not allowed' }, 403)
       const text = String(body.text || '').trim().slice(0, NEWS_MAX)
       try {
-        await writeNews(text)
+        await writeNews(text, body.on !== false)
       } catch (e) {
         return json({ error: 'Could not save news. Try again.' }, 500)
       }
