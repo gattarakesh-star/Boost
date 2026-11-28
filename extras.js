@@ -196,6 +196,13 @@
   css.textContent =
     '.social-stats{display:flex;gap:14px;align-items:center;font-size:14px;color:var(--muted);margin:6px 2px 12px;flex-wrap:wrap}' +
     '.social-stats b{color:var(--ink)}' +
+    '.flash-news{display:flex;align-items:center;gap:8px;margin:0 2px 12px;padding:9px 10px;border-radius:14px;border:2px solid #f2a900;background:linear-gradient(90deg,#fff6d8,#ffe3b8);color:#5a2b00;font:700 14px/1.35 system-ui;box-shadow:0 0 14px rgba(242,169,0,.35)}' +
+    '.flash-news .flash-text{flex:1;min-width:0;white-space:normal;overflow-wrap:anywhere;word-break:break-word;text-align:center}' +
+    '.flash-news .alarm{font-size:18px;line-height:1;flex:none;filter:drop-shadow(0 0 5px #e33);animation:alarmBlink .8s ease-in-out infinite alternate}' +
+    '.flash-news .alarm-r{animation-delay:.4s}' +
+    '@keyframes alarmBlink{from{opacity:.35;transform:scale(.88)}to{opacity:1;transform:scale(1.12)}}' +
+    '@media(prefers-color-scheme:dark){.flash-news{background:#3a2a12;border-color:#f5b82e;color:#ffe3ad;box-shadow:0 0 14px rgba(245,184,46,.25)}}' +
+    '@media(prefers-reduced-motion:reduce){.flash-news .alarm{animation:none}}' +
     '.reviews{margin-top:26px}' +
     '.reviews h2{font-size:17px;margin:0 2px 10px}' +
     '.reviews h2 span{font-size:13px;color:var(--muted);font-weight:500}' +
@@ -218,6 +225,16 @@
   bar.innerHTML = '<span>👥 <b id="liveViewers">…</b> live</span><span>👁 <b id="pageViews">…</b> views</span>';
   if (stat && stat.parentNode) stat.parentNode.insertBefore(bar, stat.nextSibling);
 
+  var newsBar = document.createElement("div");
+  newsBar.className = "flash-news";
+  newsBar.id = "flashNews";
+  newsBar.innerHTML =
+    '<span class="alarm alarm-l" aria-hidden="true">🚨</span>' +
+    '<span class="flash-text" id="flashText">No flash news right now.</span>' +
+    '<span class="alarm alarm-r" aria-hidden="true">🚨</span>';
+  if (bar && bar.parentNode) bar.parentNode.insertBefore(newsBar, bar.nextSibling);
+  else if (stat && stat.parentNode) stat.parentNode.insertBefore(newsBar, stat.nextSibling);
+
   var footer = document.querySelector("footer");
   var sec = document.createElement("section");
   sec.className = "reviews";
@@ -233,11 +250,20 @@
     '</form>';
   if (footer && footer.parentNode) footer.parentNode.insertBefore(sec, footer);
 
+  function renderNews(n) {
+    var el = document.getElementById("flashText");
+    if (!el) return;
+    var text = typeof n === "string" ? n : (n && n.text) || "";
+    text = String(text).trim();
+    el.textContent = text ? text : "No flash news right now.";
+  }
+
   function renderStats(d) {
     var v = document.getElementById("liveViewers");
     var p = document.getElementById("pageViews");
     if (v) v.textContent = d.viewers == null ? "…" : d.viewers;
     if (p) p.textContent = d.views == null ? "…" : d.views;
+    renderNews(d.news);
   }
 
   function renderReviews(list) {
@@ -264,6 +290,11 @@
   async function refresh() {
     try { var d = await fetch(API, { cache: "no-store" }).then(function (r) { return r.json(); }); renderStats(d); renderReviews(d.reviews || []); } catch (e) {}
   }
+
+  // The admin editor announces changes here so the bar updates without a reload.
+  window.addEventListener("nc-news", function () {
+    fetch(API, { cache: "no-store" }).then(function (r) { return r.json(); }).then(function (d) { renderNews(d.news); }).catch(function () {});
+  });
 
   // Always announce a view on load; the server dedupes one view per browser per IST day.
   post("view").then(refresh).catch(refresh);
@@ -307,7 +338,9 @@
     '.admin-body{display:flex;flex-direction:column;gap:8px;margin-top:8px}' +
     '.admin-body[hidden]{display:none}' +
     '.admin-body select{font:15px system-ui;color:var(--ink);background:var(--card);border:2px solid var(--line);border-radius:12px;padding:10px;width:100%}' +
+    '.admin-body textarea{font:400 15px/1.35 system-ui;color:var(--ink);background:var(--card);border:2px solid var(--line);border-radius:12px;padding:10px;width:100%;min-height:76px;resize:vertical}' +
     '.admin-body button{border:0;border-radius:12px;padding:10px;background:#d33;color:#fff;font:700 14px system-ui;cursor:pointer}' +
+    '.admin-body .save-news{background:var(--bus);color:#fff}' +
     '.admin-msg{font-size:13px;color:var(--muted);margin:0}';
   document.head.appendChild(css);
 
@@ -319,6 +352,8 @@
   box.innerHTML =
     '<button type="button" class="admin-btn" id="adminBtn">🔑 Manage reviews (admin)</button>' +
     '<div class="admin-body" id="adminBody" hidden>' +
+      '<textarea id="adminNews" maxlength="500" placeholder="Flash news shown below live views…"></textarea>' +
+      '<button type="button" class="save-news" id="adminSaveNews">📣 Save flash news</button>' +
       '<select id="adminSelect"></select>' +
       '<button type="button" id="adminDelete">🗑 Delete selected review</button>' +
       '<p class="admin-msg" id="adminMsg"></p>' +
@@ -345,6 +380,8 @@
           }).join("")
         : '<option value="">No reviews yet</option>';
       msg.textContent = list.length ? list.length + " review(s) loaded." : "No reviews yet.";
+      var ta = document.getElementById("adminNews");
+      if (ta) ta.value = (d.news && d.news.text) || "";
     } catch (e) { msg.textContent = "Could not load reviews."; }
   }
 
@@ -366,6 +403,21 @@
     }
     show(true);
     load();
+  });
+
+  document.getElementById("adminSaveNews").addEventListener("click", async function () {
+    var text = document.getElementById("adminNews").value.trim();
+    msg.textContent = "Saving…";
+    try {
+      var r = await fetch(API, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ action: "set-news", key: key, text: text })
+      }).then(function (x) { return x.json(); });
+      if (r.error) { msg.textContent = r.error; return; }
+      msg.textContent = text ? "Flash news saved ✅" : "Flash news cleared ✅";
+      window.dispatchEvent(new Event("nc-news"));
+    } catch (e) { msg.textContent = "Could not save news."; }
   });
 
   document.getElementById("adminDelete").addEventListener("click", async function () {
