@@ -4,6 +4,8 @@ const SB_URL = 'https://nncpndzbcajasfkpyfiv.supabase.co'
 const SB_KEY = 'sb_publishable_sqOWZsOn8YFIH50KhhurrA_Jpp_rJoM'
 const ADMIN_KEY = 'nc-admin-7f3a9d2e'
 const TTL = 60000
+const NEWS_ID = 'main'
+const NEWS_MAX = 500
 
 // Stop IDs used by the app double as village names.
 const VILLAGES = {
@@ -72,6 +74,18 @@ async function getRows(path) {
   return (await sb(path)).json()
 }
 
+// Flash news is a single row in nc_news. If the table is missing, stay silent
+// so views, viewers and reviews keep working.
+async function readNews() {
+  try {
+    const rows = await getRows('nc_news?select=text,ts&id=eq.' + NEWS_ID + '&limit=1')
+    if (!rows.length) return { text: '', ts: 0 }
+    return { text: String(rows[0].text || ''), ts: Date.parse(rows[0].ts) || 0 }
+  } catch (e) {
+    return { text: '', ts: 0 }
+  }
+}
+
 function publicReview(r) {
   return {
     id: r.id,
@@ -117,11 +131,11 @@ async function stats() {
 export async function GET(request) {
   try {
     const type = new URL(request.url).searchParams.get('type') || 'all'
-    const list = await reviewList()
-    if (type === 'reviews') return json({ reviews: list })
-    return json(Object.assign({}, await stats(), { reviews: list }))
+    const [list, news] = await Promise.all([reviewList(), readNews()])
+    if (type === 'reviews') return json({ reviews: list, news: news })
+    return json(Object.assign({}, await stats(), { reviews: list, news: news }))
   } catch (e) {
-    return json({ views: 0, viewers: 0, reviews: [], error: 'stats unavailable' }, 502)
+    return json({ views: 0, viewers: 0, reviews: [], news: { text: '', ts: 0 }, error: 'stats unavailable' }, 502)
   }
 }
 
@@ -164,6 +178,21 @@ export async function POST(request) {
         }),
       })
       return json({ reviews: await reviewList() }, 201)
+    }
+
+    if (body.action === 'set-news') {
+      if (String(body.key || '') !== ADMIN_KEY) return json({ error: 'not allowed' }, 403)
+      const text = String(body.text || '').trim().slice(0, NEWS_MAX)
+      try {
+        await sb('nc_news?on_conflict=id', {
+          method: 'POST',
+          headers: { Prefer: 'resolution=merge-duplicates' },
+          body: JSON.stringify({ id: NEWS_ID, text: text, ts: new Date().toISOString() }),
+        })
+      } catch (e) {
+        return json({ error: 'News table missing — create nc_news in Supabase.' }, 500)
+      }
+      return json({ news: { text: text, ts: Date.now() } })
     }
 
     if (body.action === 'delete') {
